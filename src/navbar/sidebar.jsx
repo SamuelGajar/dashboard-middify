@@ -1,8 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { SimpleTreeView } from "@mui/x-tree-view/SimpleTreeView";
 import { TreeItem } from "@mui/x-tree-view/TreeItem";
+import {
+  Box,
+  Button,
+  Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Typography,
+} from "@mui/material";
+import Logo from "../assets/logo/logo-removebg-preview.png";
 
 const ORDER_STATE_ITEMS = [
   { id: "ingresada", label: "Ingresada" },
@@ -12,6 +25,8 @@ const ORDER_STATE_ITEMS = [
   { id: "en_proceso", label: "En proceso" },
   { id: "descartada", label: "Descartada" },
 ];
+
+export const SIDEBAR_WIDTH = 280;
 
 const Sidebar = ({
   tenants = [],
@@ -23,9 +38,16 @@ const Sidebar = ({
   activeOrderState = null,
   onChangeOrderState,
 }) => {
-  const hasTenants =
-    Array.isArray(tenants) &&
-    tenants.some((tenant) => tenant?.tenantId && tenant?.tenantName);
+  const { hasValidTenants, tenantOptions } = useMemo(() => {
+    if (!Array.isArray(tenants)) {
+      return { hasValidTenants: false, tenantOptions: [] };
+    }
+
+    const options = tenants.filter(
+      (tenant) => tenant?.tenantId && tenant?.tenantName
+    );
+    return { hasValidTenants: options.length > 0, tenantOptions: options };
+  }, [tenants]);
 
   const handleViewChange = (view) => {
     if (typeof onChangeView === "function") {
@@ -96,36 +118,90 @@ const Sidebar = ({
   };
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:flex">
-      <div className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Vistas
-          </p>
-          <div className="mt-2 space-y-2">
-            <button
-              type="button"
-              onClick={() => handleViewChange("dashboard")}
-              className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                activeView === "dashboard"
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-600"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600"
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewChange("stores")}
-              className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                activeView === "stores"
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-600"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600"
-              }`}
-            >
-              Tiendas
-            </button>
-            <div className="px-1 py-2">
+    <Box
+      component="aside"
+      sx={{
+        display: { xs: "none", lg: "flex" },
+        width: SIDEBAR_WIDTH,
+        flexShrink: 0,
+        position: "sticky",
+        top: 0,
+        height: "100vh",
+        alignSelf: "flex-start",
+        mr: { lg: 3 },
+      }}
+    >
+      <Paper
+        elevation={1}
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          borderColor: "divider",
+          overflow: "hidden",
+          backgroundColor: "#063279",
+        }}
+      >
+        <Stack
+          spacing={3}
+          sx={{
+            p: 3,
+            flex: 1,
+            overflowY: "auto",
+          }}
+        >
+          <Stack spacing={2}>
+            <img src={Logo} alt="Logo" width={100} height={100} />
+            {showTenantFilter && (
+            <>
+              <Divider />
+              <FormControl fullWidth size="small">
+                <InputLabel id="tenant-select-label">Tienda</InputLabel>
+                <Select
+                  labelId="tenant-select-label"
+                  id="tenant-select"
+                  label="Tienda"
+                  value={selectedTenantId ?? "all"}
+                  onChange={handleTenantChange}
+                >
+                  <MenuItem value="all">Todas las tiendas</MenuItem>
+                  {hasValidTenants &&
+                    tenantOptions.map((tenant) => (
+                      <MenuItem key={tenant.tenantId} value={tenant.tenantId}>
+                        {tenant.tenantName}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </>
+          )}
+            <Stack spacing={1}>
+              <Button
+                fullWidth
+                color="primary"
+                onClick={() => handleViewChange("dashboard")}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  fontWeight: 600,
+                }}
+              >
+                Dashboard
+              </Button>
+              <Button
+                fullWidth
+                color="primary"
+                onClick={() => handleViewChange("stores")}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  fontWeight: 600,
+                }}
+              >
+                Tiendas
+              </Button>
+            </Stack>
+            <Box sx={{ px: 1 }}>
               <SimpleTreeView
                 aria-label="órdenes"
                 expandedItems={expandedItems}
@@ -139,24 +215,19 @@ const Sidebar = ({
                 }}
                 sx={{
                   "& .MuiTreeItem-content": {
-                    borderRadius: "0.5rem",
-                    paddingRight: "0.5rem",
-                    marginBottom: "0.35rem",
+                    borderRadius: 2,
+                    pr: 1,
+                    mb: 0.5,
                   },
                   "& .MuiTreeItem-label": {
                     fontSize: "0.875rem",
-                    padding: "0.35rem 0.75rem",
+                    px: 1.5,
+                    py: 0.6,
                   },
-                  "& .MuiTreeItem-content.Mui-selected .MuiTreeItem-label": {
-                    backgroundColor: "rgba(79, 70, 229, 0.1)",
-                    color: "rgb(79, 70, 229)",
-                  },
-                  "& .MuiTreeItem-content:hover .MuiTreeItem-label": {
-                    backgroundColor: "rgba(79, 70, 229, 0.08)",
-                  },
+
                   "& .MuiTreeItem-group": {
-                    marginLeft: "0.75rem",
-                    paddingLeft: "0.5rem",
+                    ml: 1.5,
+                    pl: 1,
                     borderLeft: "1px dashed rgba(148, 163, 184, 0.4)",
                   },
                 }}
@@ -180,38 +251,11 @@ const Sidebar = ({
                   ))}
                 </TreeItem>
               </SimpleTreeView>
-            </div>
-          </div>
-        </div>
-
-        {showTenantFilter && (
-          <div>
-            <label
-              htmlFor="tenant-select"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Tienda
-            </label>
-            <div className="mt-2">
-              <select
-                id="tenant-select"
-                value={selectedTenantId ?? "all"}
-                onChange={handleTenantChange}
-                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="all">Todas las tiendas</option>
-                {hasTenants &&
-                  tenants.map((tenant) => (
-                    <option key={tenant.tenantId} value={tenant.tenantId}>
-                      {tenant.tenantName}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-    </aside>
+            </Box>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Box>
   );
 };
 

@@ -109,22 +109,24 @@ const Index = () => {
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar user={user} />
-      <div className="mx-auto flex max-w-6xl gap-6 px-4 pb-10 pt-6 sm:px-6">
-        <Sidebar
-          tenants={tenants}
-          selectedTenantId={selectedTenantId}
-          onChangeTenant={setSelectedTenantId}
-          activeView={activeView}
-          onChangeView={handleChangeView}
-          showTenantFilter={true}
-          activeOrderState={selectedOrderState}
-          onChangeOrderState={setSelectedOrderState}
-        />
-        <main className="flex-1">
-          <ActiveViewComponent {...viewProps} />
-        </main>
+    <div className="min-h-screen bg-slate-50 lg:flex">
+      <Sidebar
+        tenants={tenants}
+        selectedTenantId={selectedTenantId}
+        onChangeTenant={setSelectedTenantId}
+        activeView={activeView}
+        onChangeView={handleChangeView}
+        showTenantFilter={true}
+        activeOrderState={selectedOrderState}
+        onChangeOrderState={setSelectedOrderState}
+      />
+      <div className="flex flex-1 flex-col">
+        <Navbar user={user} />
+        <div className="flex-1 px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+          <main className="mx-auto w-full max-w-6xl">
+            <ActiveViewComponent {...viewProps} />
+          </main>
+        </div>
       </div>
     </div>
   );
