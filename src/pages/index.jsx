@@ -102,8 +102,10 @@ const Index = () => {
     filteredTenants,
     isLoading,
     marketplaceTenants,
+    selectedOrderState,
     selectedTenantId,
     tenants,
+    token,
   ]);
 
   return (

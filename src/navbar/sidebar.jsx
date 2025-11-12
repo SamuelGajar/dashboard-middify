@@ -58,6 +58,7 @@ const Sidebar = ({
         ? `orders-${activeOrderState}`
         : "orders-root"
       : null;
+  const selectedOrderItems = selectedOrderNodeId ? [selectedOrderNodeId] : [];
 
   const handleOrderTreeSelect = (_event, itemIds) => {
     const ids = Array.isArray(itemIds) ? itemIds : [itemIds];
@@ -129,9 +130,7 @@ const Sidebar = ({
                 aria-label="órdenes"
                 expandedItems={expandedItems}
                 onExpandedItemsChange={handleExpandedItemsChange}
-                selectedItems={
-                  selectedOrderNodeId ? [selectedOrderNodeId] : undefined
-                }
+                selectedItems={selectedOrderItems}
                 onSelectedItemsChange={handleOrderTreeSelect}
                 multiSelect={false}
                 slots={{

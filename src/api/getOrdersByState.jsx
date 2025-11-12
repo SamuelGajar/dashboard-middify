@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_URL =
   "https://957chi25kf.execute-api.us-east-2.amazonaws.com/dev/getOrdersByState";
+
+const CACHE_TTL_MS = 30 * 1000;
 
 const buildUrlWithParams = ({ tenantId, status, page, pageSize } = {}) => {
   const url = new URL(API_URL);
@@ -63,6 +65,7 @@ export const useOrdersByState = (
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState(null);
+  const cacheRef = useRef(new Map());
 
   useEffect(() => {
     if (!token) {
@@ -74,9 +77,33 @@ export const useOrdersByState = (
 
     const controller = new AbortController();
     let isMounted = true;
+    const cacheKey = JSON.stringify({
+      tenantId: tenantId ?? null,
+      status: status ?? null,
+      page: page ?? null,
+      pageSize: pageSize ?? null,
+    });
+    const now = Date.now();
+    const cachedResult = cacheRef.current.get(cacheKey);
+
+    if (cachedResult) {
+      if (isMounted) {
+        setOrders(cachedResult.orders);
+        setMeta(cachedResult.meta);
+        setLoading(false);
+      }
+      if (now - cachedResult.timestamp < CACHE_TTL_MS) {
+        return () => {
+          isMounted = false;
+          controller.abort();
+        };
+      }
+    }
 
     const load = async () => {
-      setLoading(true);
+      if (!cachedResult) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const data = await getOrdersByState({
@@ -88,13 +115,22 @@ export const useOrdersByState = (
           pageSize,
         });
         if (isMounted) {
-          setOrders(Array.isArray(data?.orders) ? data.orders : []);
-          setMeta({
+          const normalizedOrders = Array.isArray(data?.orders)
+            ? data.orders
+            : [];
+          const normalizedMeta = {
             ok: data?.ok ?? null,
             total: data?.total ?? null,
             page: data?.page ?? null,
             pageSize: data?.pageSize ?? null,
             totalPages: data?.totalPages ?? null,
+          };
+          setOrders(normalizedOrders);
+          setMeta(normalizedMeta);
+          cacheRef.current.set(cacheKey, {
+            orders: normalizedOrders,
+            meta: normalizedMeta,
+            timestamp: Date.now(),
           });
         }
       } catch (err) {

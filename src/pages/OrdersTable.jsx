@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useOrdersByState } from "../api/getOrdersByState";
 
 const ORDER_STATE_ITEMS = [
@@ -59,24 +58,7 @@ const OrdersTable = ({
     tenantId: selectedTenantId ?? undefined,
     status: apiStatus ?? undefined,
   });
-
-  const filteredOrders = useMemo(() => {
-    return (orders || []).filter((order) => {
-      if (!order || typeof order !== "object") {
-        return false;
-      }
-
-      const matchesTenant = selectedTenantId
-        ? order.tennantId === selectedTenantId || order.tenantId === selectedTenantId
-        : true;
-      const normalizedStatus = normalizeStatusKey(order.status);
-      const matchesStatus = selectedOrderState
-        ? normalizedStatus === selectedOrderState
-        : true;
-
-      return matchesTenant && matchesStatus;
-    });
-  }, [orders, selectedOrderState, selectedTenantId]);
+  const displayOrders = Array.isArray(orders) ? orders : [];
 
   const selectedStateLabel =
     ORDER_STATE_ITEMS.find((item) => item.id === selectedOrderState)?.label ??
@@ -134,12 +116,12 @@ const OrdersTable = ({
             Error al cargar las órdenes: {error.message}
           </div>
         )}
-        {!loading && !error && filteredOrders.length === 0 && (
+        {!loading && !error && displayOrders.length === 0 && (
           <div className="px-6 py-12 text-center text-sm text-slate-500">
             No hay órdenes disponibles para los filtros seleccionados.
           </div>
         )}
-        {!loading && !error && filteredOrders.length > 0 && (
+        {!loading && !error && displayOrders.length > 0 && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
@@ -168,7 +150,7 @@ const OrdersTable = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
-                {filteredOrders.map((order) => {
+                {displayOrders.map((order) => {
                   const orderId = order._id ?? order.id ?? "—";
                   const marketplace = order.marketPlace ?? {};
                   const statusLabel =
