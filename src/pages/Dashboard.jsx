@@ -39,7 +39,6 @@ const Dashboard = ({
 
   return (
     <div className="mt-6 space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
       {content}
     </div>
   );
