@@ -2,6 +2,7 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "react-oidc-context";
+import { BrowserRouter } from "react-router-dom";
 
 const COGNITO_DOMAIN ="https://us-east-2bws3t9vwm.auth.us-east-2.amazoncognito.com";
 const APP_URL = "http://localhost:5173";
@@ -30,6 +31,8 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
   <AuthProvider {...cognitoAuthConfig}>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </AuthProvider>
 );
