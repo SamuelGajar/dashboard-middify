@@ -59,7 +59,8 @@ export const getOrdersByState = async ({
 
 export const useOrdersByState = (
   token,
-  { tenantId = null, status = null, page = null, pageSize = null } = {}
+  { tenantId = null, status = null, page = null, pageSize = null } = {},
+  refreshTrigger = 0
 ) => {
   const [orders, setOrders] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -86,22 +87,28 @@ export const useOrdersByState = (
     const now = Date.now();
     const cachedResult = cacheRef.current.get(cacheKey);
 
-    if (cachedResult) {
+    // Si hay un refreshTrigger, invalidar el cache
+    const shouldUseCache = refreshTrigger === 0 && cachedResult && (now - cachedResult.timestamp < CACHE_TTL_MS);
+
+    if (shouldUseCache) {
       if (isMounted) {
         setOrders(cachedResult.orders);
         setMeta(cachedResult.meta);
         setLoading(false);
       }
-      if (now - cachedResult.timestamp < CACHE_TTL_MS) {
-        return () => {
-          isMounted = false;
-          controller.abort();
-        };
-      }
+      return () => {
+        isMounted = false;
+        controller.abort();
+      };
+    }
+
+    // Si hay refreshTrigger, limpiar el cache para esta clave
+    if (refreshTrigger > 0) {
+      cacheRef.current.delete(cacheKey);
     }
 
     const load = async () => {
-      if (!cachedResult) {
+      if (!cachedResult || refreshTrigger > 0) {
         setLoading(true);
       }
       setError(null);
@@ -153,7 +160,7 @@ export const useOrdersByState = (
       isMounted = false;
       controller.abort();
     };
-  }, [token, tenantId, status, page, pageSize]);
+  }, [token, tenantId, status, page, pageSize, refreshTrigger]);
 
   return { orders, meta, loading, error };
 };

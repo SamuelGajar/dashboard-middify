@@ -49,22 +49,6 @@ const Index = () => {
   const auth = useAuth();
   const token = auth.user?.id_token;
 
-  const {
-    tenants,
-    loading: tenantsLoading,
-    error: tenantsError,
-  } = useProductStates(token);
-  const {
-    tenants: marketplaceTenants,
-    loading: marketplaceLoading,
-    error: marketplaceError,
-  } = useMarketplaceSummary(token);
-  const {
-    user,
-    loading: userLoading,
-    error: userError,
-  } = useUsers(token);
-
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -79,6 +63,24 @@ const Index = () => {
   const [lastOrderState, setLastOrderState] = useState(null);
 
   const currentView = deriveView(location.pathname, Boolean(detailOrderId));
+  const autoRefresh = currentView === "dashboard" ? 1000 : null;
+
+  const {
+    tenants,
+    loading: tenantsLoading,
+    error: tenantsError,
+  } = useProductStates(token, autoRefresh);
+  const {
+    tenants: marketplaceTenants,
+    loading: marketplaceLoading,
+    error: marketplaceError,
+  } = useMarketplaceSummary(token, autoRefresh);
+  const {
+    user,
+    loading: userLoading,
+    error: userError,
+  } = useUsers(token);
+
   const sidebarActiveView =
     currentView === "detailsOrders" ? "orders" : currentView;
 
@@ -283,6 +285,7 @@ const Index = () => {
                     selectedTenantId={selectedTenantId}
                     selectedOrderState={resolvedOrderState}
                     onSelectOrder={handleSelectOrder}
+                    user={user}
                   />
                 }
               />

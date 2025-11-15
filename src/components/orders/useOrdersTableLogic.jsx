@@ -33,17 +33,22 @@ export const useOrdersTableLogic = ({
   const [allOrdersCache, setAllOrdersCache] = useState(() => new Map());
   const [allOrdersLoading, setAllOrdersLoading] = useState(false);
   const [allOrdersError, setAllOrdersError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const apiStatus = selectedOrderState
     ? selectedOrderState.replace(/_/g, " ")
     : null;
 
-  const { orders, meta, loading, error } = useOrdersByState(token, {
-    tenantId: selectedTenantId ?? undefined,
-    status: apiStatus ?? undefined,
-    page,
-    pageSize,
-  });
+  const { orders, meta, loading, error } = useOrdersByState(
+    token,
+    {
+      tenantId: selectedTenantId ?? undefined,
+      status: apiStatus ?? undefined,
+      page,
+      pageSize,
+    },
+    refreshTrigger
+  );
 
   useEffect(() => {
     setPage(1);
@@ -204,6 +209,7 @@ export const useOrdersTableLogic = ({
         id: uniqueId,
         marketplaceOrder: marketplace.orderId ?? "—",
         internalId: orderId,
+        _id: orderId,
         tenantName: order.tennantName ?? order.tenantName ?? "—",
         tenantCode: tenantId || "—",
         statusLabel,
@@ -298,6 +304,18 @@ export const useOrdersTableLogic = ({
             />
           );
         },
+      },
+      {
+        field: "_id",
+        headerName: "ID",
+        flex: 1,
+        minWidth: 180,
+        sortable: false,
+        renderCell: ({ row }) => (
+          <span className="font-mono text-sm text-slate-700">
+            {row._id}
+          </span>
+        ),
       },
       {
         field: "marketplaceOrder",
@@ -428,6 +446,27 @@ export const useOrdersTableLogic = ({
     setSearchTerm(event.target.value);
   }, []);
 
+  const clearSelection = useCallback(() => {
+    setSelectedRowIds(new Set());
+  }, []);
+
+  const getSelectedOrderIds = useCallback(() => {
+    const selectedIds = [];
+    dataGridRows.forEach((row) => {
+      if (selectedRowIds.has(row.id)) {
+        selectedIds.push(row.internalId);
+      }
+    });
+    return selectedIds;
+  }, [dataGridRows, selectedRowIds]);
+
+  const refreshData = useCallback(() => {
+    // Limpiar cache para forzar recarga
+    setAllOrdersCache(new Map());
+    // Incrementar trigger para forzar recarga en useOrdersByState
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
   const combinedLoading =
     loading || (isSearching && !cachedOrders && allOrdersLoading);
   const combinedError = allOrdersError ?? error;
@@ -437,6 +476,10 @@ export const useOrdersTableLogic = ({
     error: combinedError,
     selectedStateLabel: getSelectedStateLabel(selectedOrderState),
     searchTerm,
+    selectedRowIds: Array.from(selectedRowIds),
+    getSelectedOrderIds,
+    clearSelection,
+    refreshData,
     grid: {
       rows: paginatedRows,
       columns,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const API_URL ="https://957chi25kf.execute-api.us-east-2.amazonaws.com/dev/getProductStates";
 
@@ -21,15 +21,17 @@ export const getProductStates = async ({ token, signal } = {}) => {
   return response.json();
 };
 
-export const useProductStates = (token) => {
+export const useProductStates = (token, autoRefreshInterval = null) => {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState(null);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!token) {
       setTenants([]);
       setLoading(false);
+      isInitialLoad.current = true;
       return;
     }
 
@@ -37,13 +39,10 @@ export const useProductStates = (token) => {
     let isMounted = true;
 
     const load = async () => {
-      setLoading(true);
+      if (isInitialLoad.current) setLoading(true);
       setError(null);
       try {
-        const data = await getProductStates({
-          token,
-          signal: controller.signal,
-        });
+        const data = await getProductStates({ token, signal: controller.signal });
         if (isMounted) {
           const tenantList = Array.isArray(data)
             ? data
@@ -51,27 +50,32 @@ export const useProductStates = (token) => {
             ? data.tenants
             : [];
           setTenants(tenantList);
+          isInitialLoad.current = false;
         }
       } catch (err) {
-        if (err.name === "AbortError") {
-          return;
-        }
-        if (isMounted) {
-          setError(err);
-        }
+        if (err.name !== "AbortError" && isMounted) setError(err);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
     load();
 
+    // Auto-refresh si se especifica intervalo
+    let intervalId = null;
+    if (autoRefreshInterval && autoRefreshInterval > 0) {
+      intervalId = setInterval(load, autoRefreshInterval);
+    }
+
     return () => {
       isMounted = false;
       controller.abort();
+      if (intervalId) clearInterval(intervalId);
     };
+  }, [token, autoRefreshInterval]);
+
+  useEffect(() => {
+    isInitialLoad.current = true;
   }, [token]);
 
   return { tenants, loading, error };
