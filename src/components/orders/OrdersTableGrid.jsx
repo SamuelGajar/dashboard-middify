@@ -31,11 +31,10 @@ const OrdersTableGrid = ({
   return (
     <div className="p-4">
       <div className="overflow-x-auto">
-        <div className="mx-auto w-full min-w-[70rem] max-w-[94rem]">
+        <div className="mx-auto w-full min-w-full md:min-w-[70rem] max-w-full lg:max-w-[94rem]">
           <Paper
             elevation={0}
             sx={{
-              height: 600,
               width: "100%",
               borderRadius: "16px",
               boxShadow: "none",
@@ -46,6 +45,7 @@ const OrdersTableGrid = ({
               rows={rows}
               columns={columns}
               loading={loading}
+              autoHeight
               paginationMode={paginationMode}
               paginationModel={paginationModel}
               onPaginationModelChange={onPaginationModelChange}

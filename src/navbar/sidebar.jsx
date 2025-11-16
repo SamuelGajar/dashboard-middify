@@ -167,7 +167,7 @@ const Sidebar = ({
 
     return (
       <div className="flex h-full flex-col">
-        <div className="flex-1 overflow-y-auto">
+        <div>
           <div className={`${headerPaddingX} ${headerPaddingTop}`}>
             <div className="flex flex-col items-center">
               <img
@@ -243,10 +243,10 @@ const Sidebar = ({
               )}
             </div>
           </div>
+        </div>
 
-          <div
-            className={`${navPaddingX} ${navPaddingTop}`} 
-          >
+        <div className="flex-1 overflow-y-auto sidebar-scroll">
+          <div className={`${navPaddingX} ${navPaddingTop}`}> 
             <div className="my-2 h-px bg-white/10" />
             <nav className={`space-y-4 ${navAlignment}`}> 
               <div className="space-y-2"> 
