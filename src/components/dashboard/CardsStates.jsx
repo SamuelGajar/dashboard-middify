@@ -74,7 +74,7 @@ const aggregateTenantsById = (tenants = []) => {
   );
 };
 
-const STATE_DEFINITIONS = [
+export const STATE_DEFINITIONS = [
   { key: "ingresada", label: "Ingresada" },
   { key: "en proceso", label: "Proceso" },
   { key: "pendiente", label: "Pendiente" },

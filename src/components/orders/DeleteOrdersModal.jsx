@@ -5,9 +5,21 @@ const DeleteOrdersModal = ({
   onClose,
   onConfirm,
   selectedCount,
-  isDeleting,
+  isProcessing,
+  statusLabel,
+  statusValue,
 }) => {
   if (!isOpen) return null;
+
+  const isDeleteAction = statusValue === "deleted";
+  const accentIconBg = isDeleteAction ? "bg-red-100" : "bg-indigo-100";
+  const accentIconColor = isDeleteAction ? "text-red-600" : "text-indigo-600";
+  const confirmButtonClasses = isDeleteAction
+    ? "inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
+    : "inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-300 bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6";
+  const processingLabel = isDeleteAction ? "Eliminando..." : "Actualizando...";
+  const confirmLabel = isDeleteAction ? "Eliminar" : "Confirmar";
+  const title = isDeleteAction ? "Confirmar eliminación" : "Confirmar cambio de estado";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -16,17 +28,17 @@ const DeleteOrdersModal = ({
         className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
-
-      {/* Modal */}
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-start gap-4">
           {/* Icono de advertencia */}
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+          <div
+            className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${accentIconBg}`}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="h-6 w-6 text-red-600"
+              className={`h-6 w-6 ${accentIconColor}`}
             >
               <path
                 fillRule="evenodd"
@@ -38,19 +50,19 @@ const DeleteOrdersModal = ({
 
           {/* Contenido */}
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-900">
-              Confirmar eliminación
-            </h3>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
             <div className="mt-2">
               <p className="text-sm text-slate-600">
-                ¿Estás seguro de que deseas eliminar{" "}
+                ¿Estás seguro de que deseas cambiar el estado de{" "}
                 <span className="font-semibold text-slate-900">
                   {selectedCount}
                 </span>{" "}
-                {selectedCount === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
+                {selectedCount === 1 ? "orden seleccionada" : "órdenes seleccionadas"} a{" "}
+                <span className="font-semibold text-slate-900">
+                  {statusLabel ?? "este estado"}
+                </span>
                 ?
               </p>
-
             </div>
 
             {/* Botones */}
@@ -58,7 +70,7 @@ const DeleteOrdersModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={isDeleting}
+                disabled={isProcessing}
                 className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
               >
                 Cancelar
@@ -66,10 +78,10 @@ const DeleteOrdersModal = ({
               <button
                 type="button"
                 onClick={onConfirm}
-                disabled={isDeleting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
+                disabled={isProcessing}
+                className={confirmButtonClasses}
               >
-                {isDeleting ? (
+                {isProcessing ? (
                   <>
                     <svg
                       className="h-4 w-4 animate-spin"
@@ -91,7 +103,7 @@ const DeleteOrdersModal = ({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Eliminando...
+                    {processingLabel}
                   </>
                 ) : (
                   <>
@@ -107,7 +119,7 @@ const DeleteOrdersModal = ({
                         clipRule="evenodd"
                       />
                     </svg>
-                    Eliminar
+                    {confirmLabel}
                   </>
                 )}
               </button>
@@ -124,11 +136,15 @@ DeleteOrdersModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
   selectedCount: PropTypes.number.isRequired,
-  isDeleting: PropTypes.bool,
+  isProcessing: PropTypes.bool,
+  statusLabel: PropTypes.string,
+  statusValue: PropTypes.string,
 };
 
 DeleteOrdersModal.defaultProps = {
-  isDeleting: false,
+  isProcessing: false,
+  statusLabel: "",
+  statusValue: "",
 };
 
 export default DeleteOrdersModal;

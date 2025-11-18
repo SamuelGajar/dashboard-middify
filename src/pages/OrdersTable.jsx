@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import OrdersTableHeader from "../components/orders/OrdersTableHeader";
 import OrdersTableGrid from "../components/orders/OrdersTableGrid";
 import DeleteOrdersModal from "../components/orders/DeleteOrdersModal";
 import { useOrdersTableLogic } from "../components/orders/useOrdersTableLogic";
 import { patchStateOrder } from "../api/orders/patchStateOrder";
+import { STATE_DEFINITIONS } from "../components/dashboard/CardsStates";
 
 const OrdersTable = ({
   token = null,
@@ -28,80 +29,133 @@ const OrdersTable = ({
     onSelectOrder,
   });
 
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [selectedStatusValue, setSelectedStatusValue] = useState("");
 
-  const handleDeleteClick = useCallback(() => {
-    const selectedIds = getSelectedOrderIds();
-    if (selectedIds.length === 0) {
-      return;
-    }
-    setShowDeleteModal(true);
-  }, [getSelectedOrderIds]);
+  const stateOptions = useMemo(() => {
+    const baseOptions =
+      STATE_DEFINITIONS?.map(({ key, label }) => ({
+        value: key,
+        label,
+      })) ?? [];
+
+    const hasDeleted = baseOptions.some((option) => option.value === "deleted");
+
+    return hasDeleted
+      ? baseOptions
+      : [...baseOptions, { value: "deleted", label: "Eliminada" }];
+  }, []);
+
+  const handleStateSelection = useCallback(
+    (value) => {
+      setSelectedStatusValue(value);
+
+      if (!value) {
+        setPendingStatus(null);
+        return;
+      }
+
+      const selectedIds = getSelectedOrderIds();
+      if (selectedIds.length === 0) {
+        alert("Selecciona al menos una orden para actualizar su estado.");
+        setSelectedStatusValue("");
+        setPendingStatus(null);
+        return;
+      }
+
+      const option =
+        stateOptions.find((stateOption) => stateOption.value === value) ?? null;
+
+      setPendingStatus(
+        option ?? {
+          value,
+          label: value,
+        }
+      );
+      setShowStatusModal(true);
+    },
+    [getSelectedOrderIds, stateOptions]
+  );
 
   const handleCloseModal = useCallback(() => {
-    if (!isDeleting) {
-      setShowDeleteModal(false);
+    if (!isUpdatingStatus) {
+      setShowStatusModal(false);
+      setPendingStatus(null);
+      setSelectedStatusValue("");
     }
-  }, [isDeleting]);
+  }, [isUpdatingStatus]);
 
-  const handleConfirmDelete = useCallback(async () => {
+  const handleConfirmStatusChange = useCallback(async () => {
     const selectedIds = getSelectedOrderIds();
-    if (selectedIds.length === 0) {
-      setShowDeleteModal(false);
+    if (selectedIds.length === 0 || !pendingStatus) {
+      setShowStatusModal(false);
+      setPendingStatus(null);
+      setSelectedStatusValue("");
       return;
     }
 
     if (!token) {
       alert("Error: No hay token de autenticación disponible.");
-      setShowDeleteModal(false);
+      setShowStatusModal(false);
+      setPendingStatus(null);
+      setSelectedStatusValue("");
       return;
     }
 
     if (!user) {
       alert("Error: No hay información de usuario disponible.");
-      setShowDeleteModal(false);
+      setShowStatusModal(false);
+      setPendingStatus(null);
+      setSelectedStatusValue("");
       return;
     }
 
-    setIsDeleting(true);
+    setIsUpdatingStatus(true);
     try {
-      // Obtener email del usuario
       const userEmail = user.email || user.mail || user.username || "usuario";
       const userName = user.name || user.username || userEmail;
 
       await patchStateOrder({
         token,
         ids: selectedIds,
-        status: "deleted",
+        status: pendingStatus.value,
         user: userName,
         mailUser: userEmail,
       });
 
-      // Refrescar datos y limpiar selección
       refreshData();
       clearSelection();
-      setShowDeleteModal(false);
+      setShowStatusModal(false);
+      setPendingStatus(null);
+      setSelectedStatusValue("");
     } catch (err) {
-      console.error("Error al eliminar órdenes:", err);
+      console.error("Error al actualizar órdenes:", err);
       alert(
-        `Error al eliminar las órdenes: ${err.message || "Error desconocido"}`
+        `Error al actualizar las órdenes: ${err.message || "Error desconocido"}`
       );
     } finally {
-      setIsDeleting(false);
+      setIsUpdatingStatus(false);
     }
-  }, [token, user, getSelectedOrderIds, refreshData, clearSelection]);
+  }, [
+    token,
+    user,
+    getSelectedOrderIds,
+    pendingStatus,
+    refreshData,
+    clearSelection,
+  ]);
 
   return (
     <>
       <div className="flex flex-col gap-6 pt-4">
         <OrdersTableHeader
-          token={token}
           selectedCount={selectedRowIds.length}
-          onDeleteSelected={handleDeleteClick}
-          isDeleting={isDeleting}
-          onSearchIds={onSearchIds}
-          onSearchLoading={onSearchLoading}
+          onChangeState={handleStateSelection}
+          isProcessing={isUpdatingStatus}
+          stateOptions={stateOptions}
+          selectedState={selectedStatusValue}
         />
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <OrdersTableGrid
@@ -119,11 +173,13 @@ const OrdersTable = ({
         </section>
       </div>
       <DeleteOrdersModal
-        isOpen={showDeleteModal}
+        isOpen={showStatusModal}
         onClose={handleCloseModal}
-        onConfirm={handleConfirmDelete}
+        onConfirm={handleConfirmStatusChange}
         selectedCount={selectedRowIds.length}
-        isDeleting={isDeleting}
+        isProcessing={isUpdatingStatus}
+        statusLabel={pendingStatus?.label}
+        statusValue={pendingStatus?.value}
       />
     </>
   );

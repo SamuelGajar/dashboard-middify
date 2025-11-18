@@ -307,6 +307,7 @@ const Index = () => {
                     token={token}
                     selectedTenantId={selectedTenantId}
                     onSelectOrder={handleSelectOrder}
+                    user={user}
                   />
                 }
               />
