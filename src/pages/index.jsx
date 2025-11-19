@@ -17,7 +17,7 @@ import Navbar from "../navbar/navbar";
 import Sidebar from "../navbar/sidebar";
 import Dashboard from "./Dashboard";
 import Stores from "./Stores";
-import StoreDetail from "./StoreDetail";
+import StoreDetail from "../components/stores/StoreDetail";
 import OrdersTable from "./OrdersTable";
 import DetailsOrders from "./DetailsOrders";
 import RecycleBin from "./RecycleBin";
