@@ -1,5 +1,6 @@
 import PropTypes from "prop-types";
 import SearchIcon from "@mui/icons-material/Search";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 
 const OrdersTableHeader = ({
@@ -15,12 +16,16 @@ const OrdersTableHeader = ({
   onSearchChange,
   searchPlaceholder,
   searchDisabled,
+  onExportData,
+  isExportingData,
+  exportDisabled,
 }) => {
   const hasSelection = selectedCount > 0;
   const shouldDisableSearch =
     typeof onSearchChange !== "function"
       ? true
       : searchDisabled ?? false;
+  const canTriggerExport = typeof onExportData === "function" && !exportDisabled;
 
   return (
     <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -92,25 +97,52 @@ const OrdersTableHeader = ({
             )}
           </div>
           <div className="w-full max-w-md">
-            <label className="relative block">
-              <span className="sr-only">Buscar órdenes</span>
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                <SearchIcon fontSize="small" />
-              </span>
-              <input
-                type="search"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(event) => {
-                  if (shouldDisableSearch) {
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canTriggerExport || isExportingData) {
                     return;
                   }
-                  onSearchChange(event);
+                  onExportData();
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={shouldDisableSearch}
-              />
-            </label>
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-500 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                disabled={!canTriggerExport || isExportingData}
+                aria-label="Exportar órdenes visibles a Excel"
+                title="Exportar órdenes a Excel"
+              >
+                {isExportingData ? (
+                  <>
+                    <CircularProgress size={16} />
+                    Exportando...
+                  </>
+                ) : (
+                  <>
+                    <FileDownloadOutlinedIcon fontSize="small" />
+                    Exportar Excel
+                  </>
+                )}
+              </button>
+              <label className="relative block flex-1">
+                <span className="sr-only">Buscar órdenes</span>
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                  <SearchIcon fontSize="small" />
+                </span>
+                <input
+                  type="search"
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onChange={(event) => {
+                    if (shouldDisableSearch) {
+                      return;
+                    }
+                    onSearchChange(event);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={shouldDisableSearch}
+                />
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -143,6 +175,9 @@ OrdersTableHeader.propTypes = {
   onSearchChange: PropTypes.func,
   searchPlaceholder: PropTypes.string,
   searchDisabled: PropTypes.bool,
+  onExportData: PropTypes.func,
+  isExportingData: PropTypes.bool,
+  exportDisabled: PropTypes.bool,
 };
 
 OrdersTableHeader.defaultProps = {
@@ -158,6 +193,9 @@ OrdersTableHeader.defaultProps = {
   onSearchChange: undefined,
   searchPlaceholder: "Buscar en cualquier campo...",
   searchDisabled: true,
+  onExportData: undefined,
+  isExportingData: false,
+  exportDisabled: false,
 };
 
 export default OrdersTableHeader;

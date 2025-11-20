@@ -5,6 +5,8 @@ import DeleteOrdersModal from "../components/orders/DeleteOrdersModal";
 import { useOrdersTableLogic } from "../components/orders/useOrdersTableLogic";
 import { patchStateOrder } from "../api/orders/patchStateOrder";
 import { STATE_DEFINITIONS } from "../components/dashboard/CardsStates";
+import exportOrdersToExcel from "../utils/exportOrdersToExcel";
+import { fetchOrdersByStateAllPages } from "../api/orders/getOrdersByState";
 
 const OrdersTable = ({
   token = null,
@@ -21,8 +23,10 @@ const OrdersTable = ({
     getSelectedOrderIds,
     clearSelection,
     refreshData,
+    selectedStateLabel,
     onSearchIds,
     onSearchLoading,
+    formatOrdersForExport,
   } = useOrdersTableLogic({
     token,
     selectedTenantId,
@@ -35,6 +39,7 @@ const OrdersTable = ({
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [selectedStatusValue, setSelectedStatusValue] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const stateOptions = useMemo(() => {
     const baseOptions =
@@ -149,6 +154,87 @@ const OrdersTable = ({
     clearSelection,
   ]);
 
+  const exportFileName = useMemo(() => {
+    const parts = ["ordenes"];
+    const sanitize = (value) =>
+      String(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9-_]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "")
+        .toLowerCase();
+
+    if (selectedTenantName) {
+      parts.push(selectedTenantName);
+    }
+    if (selectedStateLabel) {
+      parts.push(selectedStateLabel);
+    }
+
+    const formatted = parts
+      .filter(Boolean)
+      .map((part) => sanitize(part))
+      .filter(Boolean)
+      .join("_");
+
+    return `${formatted || "ordenes"}.xlsx`;
+  }, [selectedTenantName, selectedStateLabel]);
+
+  const handleExportAllOrders = useCallback(async () => {
+    if (!token) {
+      alert("No hay token de autenticación para exportar.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const statusParam = selectedOrderState
+        ? selectedOrderState.replace(/_/g, " ")
+        : undefined;
+      const preferredPageSize =
+        Array.isArray(grid?.pageSizeOptions) && grid.pageSizeOptions.length > 0
+          ? Math.max(...grid.pageSizeOptions)
+          : 500;
+
+      const { orders: allOrders } = await fetchOrdersByStateAllPages({
+        token,
+        params: {
+          tenantId: selectedTenantId ?? undefined,
+          tenantName: selectedTenantName ?? undefined,
+          status: statusParam,
+        },
+        pageSize: preferredPageSize,
+      });
+
+      if (!Array.isArray(allOrders) || allOrders.length === 0) {
+        alert("No hay órdenes disponibles para exportar.");
+        return;
+      }
+
+      const formattedRows = formatOrdersForExport(allOrders);
+      exportOrdersToExcel({
+        rows: formattedRows,
+        columns: grid.columns,
+        fileName: exportFileName,
+      });
+    } catch (error) {
+      console.error("Error al exportar las órdenes:", error);
+      alert(`No se pudo exportar las órdenes: ${error.message ?? "Error desconocido"}`);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [
+    token,
+    selectedOrderState,
+    grid?.pageSizeOptions,
+    grid.columns,
+    selectedTenantId,
+    selectedTenantName,
+    exportFileName,
+    formatOrdersForExport,
+  ]);
+
   return (
     <>
       <div className="flex flex-col gap-6 pt-4">
@@ -158,6 +244,9 @@ const OrdersTable = ({
           isProcessing={isUpdatingStatus}
           stateOptions={stateOptions}
           selectedState={selectedStatusValue}
+          onExportData={handleExportAllOrders}
+          isExportingData={isExporting}
+          exportDisabled={!token || grid.rowCount === 0}
         />
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <OrdersTableGrid

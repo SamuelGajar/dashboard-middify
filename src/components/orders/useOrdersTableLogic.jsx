@@ -203,26 +203,34 @@ export const useOrdersTableLogic = ({
     return [...PAGE_SIZE_OPTIONS_BASE, pageSize].sort((a, b) => a - b);
   }, [pageSize]);
 
-  const dataGridRows = useMemo(() => {
-    return displayOrders.map((order, index) => {
-      const orderId = order._id ?? order.id ?? `order-${index}`;
-      const tenantId = order.tennantId ?? order.tenantId ?? "";
-      const uniqueId = `${orderId}-${tenantId || index}`;
+const mapOrdersToGridRows = (orders, activeColumns) => {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return [];
+  }
 
-      const row = {
-        id: uniqueId,
-        internalId: orderId,
-        tenantId,
-        rawOrder: order,
-      };
+  return orders.map((order, index) => {
+    const orderId = order._id ?? order.id ?? `order-${index}`;
+    const tenantId = order.tennantId ?? order.tenantId ?? "";
+    const uniqueId = `${orderId}-${tenantId || index}`;
 
-      activeColumns.forEach((column) => {
-        row[column.value] = formatColumnValue(column.value, order);
-      });
+    const row = {
+      id: uniqueId,
+      internalId: orderId,
+      tenantId,
+      rawOrder: order,
+    };
 
-      return row;
+    activeColumns.forEach((column) => {
+      row[column.value] = formatColumnValue(column.value, order);
     });
-  }, [activeColumns, displayOrders]);
+
+    return row;
+  });
+};
+  const dataGridRows = useMemo(
+    () => mapOrdersToGridRows(displayOrders, activeColumns),
+    [activeColumns, displayOrders]
+  );
 
   useEffect(() => {
     setSelectedRowIds((prevSelected) => {
@@ -338,9 +346,60 @@ export const useOrdersTableLogic = ({
     [page, pageSize]
   );
 
-  const rowCount = Number.isFinite(Number(meta?.total))
-    ? Number(meta?.total)
-    : dataGridRows.length;
+  const dataGridRowCount = dataGridRows.length;
+
+  useEffect(() => {
+    if (!loading && page > 1 && dataGridRowCount === 0) {
+      setPage((prev) => Math.max(prev - 1, 1));
+    }
+  }, [loading, page, dataGridRowCount]);
+
+  const rowCount = useMemo(() => {
+    const totalCandidates = [
+      meta?.total,
+      meta?.totalOrders,
+      meta?.totalItems,
+      meta?.count,
+      meta?.records,
+      meta?.recordsCount,
+      meta?.rows,
+    ];
+
+    for (const candidate of totalCandidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed >= dataGridRowCount) {
+        return parsed;
+      }
+    }
+
+    const totalPages = Number(meta?.totalPages ?? meta?.pages);
+    const metaPageSize = Number(
+      meta?.pageSize ?? meta?.limit ?? meta?.perPage ?? pageSize
+    );
+    if (Number.isFinite(totalPages) && Number.isFinite(metaPageSize)) {
+      return totalPages * metaPageSize;
+    }
+
+    const hasMoreHint =
+      Boolean(meta?.hasMore) ||
+      Boolean(meta?.hasNext) ||
+      Boolean(meta?.hasNextPage) ||
+      Boolean(meta?.nextPage) ||
+      Boolean(meta?.next) ||
+      Boolean(meta?.nextToken) ||
+      Boolean(meta?.lastKey) ||
+      Boolean(meta?.lastEvaluatedKey) ||
+      Boolean(meta?.cursor) ||
+      Boolean(meta?.pagination?.hasMore);
+
+    const completedRows = (page - 1) * pageSize + dataGridRowCount;
+
+    if (hasMoreHint || dataGridRowCount === pageSize) {
+      return completedRows + pageSize;
+    }
+
+    return completedRows;
+  }, [meta, dataGridRowCount, page, pageSize]);
 
   const handleRowClick = useCallback(
     (params) => {
@@ -369,6 +428,11 @@ export const useOrdersTableLogic = ({
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  const formatOrdersForExport = useCallback(
+    (ordersList) => mapOrdersToGridRows(ordersList, activeColumns),
+    [activeColumns]
+  );
+
   return {
     loading,
     error,
@@ -377,6 +441,7 @@ export const useOrdersTableLogic = ({
     getSelectedOrderIds,
     clearSelection,
     refreshData,
+    formatOrdersForExport,
     grid: {
       rows: dataGridRows,
       columns,

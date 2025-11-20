@@ -113,6 +113,48 @@ export async function fetchTenantColumns({
   return DASHBOARD_COLUMNS_TEMPLATE.map((column) => ({ ...column }));
 }
 
+const buildMetaFromPayload = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const fallbackMeta = {
+    total: payload?.total ?? payload?.totalOrders ?? payload?.count ?? null,
+    totalOrders: payload?.totalOrders ?? payload?.total ?? null,
+    count: payload?.count ?? payload?.total ?? null,
+    totalPages: payload?.totalPages ?? payload?.pages ?? null,
+    page: payload?.page ?? payload?.currentPage ?? 1,
+    pageSize: payload?.pageSize ?? payload?.limit ?? payload?.perPage ?? null,
+    hasMore:
+      payload?.hasMore ??
+      payload?.hasNext ??
+      payload?.hasNextPage ??
+      payload?.pagination?.hasMore ??
+      null,
+    nextPage:
+      payload?.nextPage ??
+      payload?.pagination?.nextPage ??
+      payload?.pagination?.next ??
+      null,
+    cursor:
+      payload?.cursor ??
+      payload?.nextToken ??
+      payload?.lastEvaluatedKey ??
+      payload?.lastKey ??
+      null,
+    pagination: payload?.pagination ?? null,
+  };
+
+  if (payload?.meta && typeof payload.meta === "object") {
+    return {
+      ...fallbackMeta,
+      ...payload.meta,
+    };
+  }
+
+  return fallbackMeta;
+};
+
 export const fetchOrdersByState = async ({
   token,
   params = {},
@@ -135,8 +177,77 @@ export const fetchOrdersByState = async ({
 
   return {
     orders: Array.isArray(payload?.orders) ? payload.orders : [],
-    meta: payload?.meta || null,
+    meta: buildMetaFromPayload(payload),
   };
+};
+
+export const fetchOrdersByStateAllPages = async ({
+  token,
+  params = {},
+  pageSize = 500,
+  signal,
+  onPage,
+  maxPages,
+} = {}) => {
+  if (!token) throw new Error("Falta token");
+
+  const safePageSize = Number(pageSize) > 0 ? Number(pageSize) : 500;
+  const baseParams = { ...params };
+  const accumulatedOrders = [];
+  let currentPage = 1;
+  let shouldContinue = true;
+
+  while (shouldContinue) {
+    const { orders, meta } = await fetchOrdersByState({
+      token,
+      params: {
+        ...baseParams,
+        page: currentPage,
+        pageSize: safePageSize,
+      },
+      signal,
+    });
+
+    accumulatedOrders.push(...orders);
+
+    if (typeof onPage === "function") {
+      onPage({
+        page: currentPage,
+        pageSize: safePageSize,
+        received: orders.length,
+        accumulated: accumulatedOrders.length,
+        meta,
+      });
+    }
+
+    const totalPages = Number(meta?.totalPages);
+    const hasMoreHint =
+      Boolean(meta?.hasMore) ||
+      Boolean(meta?.hasNext) ||
+      Boolean(meta?.hasNextPage) ||
+      Boolean(meta?.nextPage) ||
+      Boolean(meta?.nextToken) ||
+      Boolean(meta?.lastKey) ||
+      Boolean(meta?.lastEvaluatedKey) ||
+      Boolean(meta?.cursor);
+
+    if (Number.isFinite(totalPages)) {
+      shouldContinue = currentPage < totalPages;
+    } else if (orders.length === 0) {
+      shouldContinue = false;
+    } else if (hasMoreHint) {
+      shouldContinue = true;
+    } else {
+      shouldContinue = orders.length === safePageSize;
+    }
+
+    currentPage += 1;
+    if (maxPages && currentPage > maxPages) {
+      shouldContinue = false;
+    }
+  }
+
+  return { orders: accumulatedOrders };
 };
 
 export const useOrdersByState = (token, params = {}, refreshTrigger = 0) => {

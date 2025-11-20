@@ -5,6 +5,8 @@ import DeleteOrdersModal from "../components/orders/DeleteOrdersModal";
 import { useOrdersTableLogic } from "../components/orders/useOrdersTableLogic";
 import { patchStateOrder } from "../api/orders/patchStateOrder";
 import { STATE_DEFINITIONS } from "../components/dashboard/CardsStates";
+import exportOrdersToExcel from "../utils/exportOrdersToExcel";
+import { fetchOrdersByStateAllPages } from "../api/orders/getOrdersByState";
 
 const numberFormatter = new Intl.NumberFormat("es-CL");
 
@@ -21,6 +23,7 @@ const RecycleBin = ({
     getSelectedOrderIds,
     clearSelection,
     refreshData,
+    formatOrdersForExport,
   } = useOrdersTableLogic({
     token,
     selectedTenantId,
@@ -32,6 +35,7 @@ const RecycleBin = ({
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [selectedStatusValue, setSelectedStatusValue] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const stateOptions = useMemo(() => {
     const baseOptions =
@@ -51,6 +55,67 @@ const RecycleBin = ({
     () => grid.columns.filter((col) => col.field !== "total"),
     [grid.columns]
   );
+
+  const exportFileName = useMemo(() => {
+    const base = selectedTenantId ? `ordenes_papelera_${selectedTenantId}` : "ordenes_papelera";
+    return base
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9-_]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .concat(".xlsx");
+  }, [selectedTenantId]);
+
+  const handleExportDeletedOrders = useCallback(async () => {
+    if (!token) {
+      alert("No hay token de autenticación para exportar.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const preferredPageSize =
+        Array.isArray(grid?.pageSizeOptions) && grid.pageSizeOptions.length > 0
+          ? Math.max(...grid.pageSizeOptions)
+          : 500;
+
+      const { orders: allOrders } = await fetchOrdersByStateAllPages({
+        token,
+        params: {
+          tenantId: selectedTenantId ?? undefined,
+          status: "deleted",
+        },
+        pageSize: preferredPageSize,
+      });
+
+      if (!Array.isArray(allOrders) || allOrders.length === 0) {
+        alert("No hay órdenes disponibles para exportar.");
+        return;
+      }
+
+      const formattedRows = formatOrdersForExport(allOrders);
+      exportOrdersToExcel({
+        rows: formattedRows,
+        columns,
+        fileName: exportFileName,
+      });
+    } catch (error) {
+      console.error("Error al exportar la papelera:", error);
+      alert(
+        `No se pudo exportar la papelera: ${error.message ?? "Error desconocido"}`
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }, [
+    token,
+    grid?.pageSizeOptions,
+    selectedTenantId,
+    columns,
+    exportFileName,
+    formatOrdersForExport,
+  ]);
 
   const handleStateSelection = useCallback(
     (value) => {
@@ -169,6 +234,9 @@ const RecycleBin = ({
         selectedState={selectedStatusValue}
         searchPlaceholder="Buscar por ID, mensaje, tienda..."
         searchDisabled
+        onExportData={handleExportDeletedOrders}
+        isExportingData={isExporting}
+        exportDisabled={!token || grid.rowCount === 0}
       />
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">

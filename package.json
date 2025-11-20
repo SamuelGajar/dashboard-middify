@@ -22,9 +22,10 @@
     "oidc-client-ts": "^3.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^6.28.0",
     "react-oidc-context": "^3.3.0",
-    "tailwindcss": "^4.1.17"
+    "react-router-dom": "^6.28.0",
+    "tailwindcss": "^4.1.17",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
