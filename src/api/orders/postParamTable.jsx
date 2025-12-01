@@ -1,4 +1,3 @@
-// api/postParamTable.js
 const API_URL =
   "https://957chi25kf.execute-api.us-east-2.amazonaws.com/dev/postParamTable";
 

@@ -11,6 +11,7 @@ import { STATE_DEFINITIONS } from "../components/dashboard/CardsStates";
 const PRIMARY_NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", Icon: AssessmentIcon },
   { id: "stores", label: "Tiendas", Icon: ApartmentIcon },
+  { id: "products", label: "Productos", Icon: Inventory2Icon },
 ];
 
 const normalizeStateId = (value = "") =>
@@ -32,9 +33,8 @@ export const SIDEBAR_COLLAPSED_WIDTH = 84;
 
 const StatusDot = ({ active }) => (
   <span
-    className={`inline-flex h-2.5 w-2.5 rounded-full transition-all duration-200 ${
-      active ? "bg-white scale-110" : "bg-white/60"
-    }`}
+    className={`inline-flex h-2.5 w-2.5 rounded-full transition-all duration-200 ${active ? "bg-white scale-110" : "bg-white/60"
+      }`}
   />
 );
 
@@ -48,7 +48,7 @@ const Sidebar = ({
   activeOrderState = null,
   onChangeOrderState,
   isCollapsed = false,
-  onToggleCollapse = () => {},
+  onToggleCollapse = () => { },
   isMobileOpen = false,
   onCloseMobile = null,
   userRole = null,
@@ -185,9 +185,8 @@ const Sidebar = ({
               <img
                 src={collapsed ? LogoCompact : LogoFull}
                 alt="Logo Middify"
-                className={`transition-all duration-200 ${
-                  collapsed ? "w-10" : "w-24"
-                }`}
+                className={`transition-all duration-200 ${collapsed ? "w-10" : "w-24"
+                  }`}
               />
 
               {showTenantFilter && !collapsed && (
@@ -251,16 +250,16 @@ const Sidebar = ({
                     </div>
                   </div>
                 </div>
-              
+
               )}
             </div>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto sidebar-scroll">
-          <div className={`${navPaddingX} ${navPaddingTop}`}> 
+          <div className={`${navPaddingX} ${navPaddingTop}`}>
             <div className="my-2 h-px bg-white/10" />
-            <nav className={`space-y-4 ${navAlignment}`}> 
+            <nav className={`space-y-4 ${navAlignment}`}>
               <div className="space-y-2">
                 {primaryNavItems.map(({ id, label, Icon }) => {
                   const isActive = activeView === id;
@@ -274,9 +273,8 @@ const Sidebar = ({
                       {renderIconWrapper(<Icon fontSize="small" />, isActive)}
                       {!collapsed && (
                         <span
-                          className={`transition-all duration-200 ${
-                            isActive ? "text-white font-semibold" : "text-white/90"
-                          }`}
+                          className={`transition-all duration-200 ${isActive ? "text-white font-semibold" : "text-white/90"
+                            }`}
                         >
                           {label}
                         </span>
@@ -303,38 +301,34 @@ const Sidebar = ({
                   >
                     {renderIconWrapper(<Inventory2Icon fontSize="small" />, activeView === "orders")}
                     {!collapsed && (
-                      <span className={`transition-all duration-200 ${
-                        activeView === "orders" ? "text-white font-semibold" : "text-white/90"
-                      }`}>
+                      <span className={`transition-all duration-200 ${activeView === "orders" ? "text-white font-semibold" : "text-white/90"
+                        }`}>
                         Órdenes
                       </span>
                     )}
                   </div>
                   {!collapsed && (
                     <ExpandMoreIcon
-                      className={`text-white/70 transition-all duration-300 ${
-                        ordersExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`text-white/70 transition-all duration-300 ${ordersExpanded ? "rotate-180" : ""
+                        }`}
                       fontSize="small"
                     />
                   )}
                 </button>
 
                 {!collapsed && (
-                  <div 
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      ordersExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${ordersExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
                   >
                     <div className="ml-2 space-y-1 border-l border-white/15 pl-4 pt-1">
                       <button
                         type="button"
                         onClick={handleOrderRootClick}
-                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${
-                          isOrdersRootActive
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${isOrdersRootActive
                             ? "bg-white/15 font-semibold text-white shadow shadow-black/10"
                             : "text-white/80 hover:bg-white/10 hover:text-white"
-                        }`}
+                          }`}
                       >
                         <StatusDot active={isOrdersRootActive} />
                         <span>Todas</span>
@@ -346,11 +340,10 @@ const Sidebar = ({
                             key={state.id}
                             type="button"
                             onClick={() => handleOrderStateClick(state.id)}
-                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${
-                              isActive
+                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${isActive
                                 ? "bg-white/15 font-semibold text-white shadow shadow-black/10"
                                 : "text-white/80 hover:bg-white/10 hover:text-white"
-                            }`}
+                              }`}
                           >
                             <StatusDot active={isActive} />
                             <span>{state.label}</span>

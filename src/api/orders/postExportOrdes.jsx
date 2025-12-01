@@ -5,6 +5,7 @@ const API_URL =
 
 export const postExportOrders = async (token, body) => {
   try {
+    console.log('📤 Sending export request to backend:', { url: API_URL, body });
     const response = await axios.post(API_URL, body, {
       headers: {
         Authorization: token,

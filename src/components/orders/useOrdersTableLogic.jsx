@@ -12,7 +12,7 @@ import {
 } from "./helpers";
 import { useExportOrders } from "./useExportOrders";
 
-const PAGE_SIZE_OPTIONS_BASE = [10, 20, 50, 100, 1000, 10000];
+const PAGE_SIZE_OPTIONS_BASE = [10, 20, 50, 100];
 
 const getColumnRawValue = (order, key) => {
   if (!order) return null;
@@ -242,10 +242,13 @@ export const useOrdersTableLogic = ({
       tenantId: selectedTenantId,
       tenantName: selectedTenantName,
     };
-    // Remove undefined keys
+    // Remove undefined and null keys
     Object.keys(filters).forEach(
-      (key) => filters[key] === undefined && delete filters[key]
+      (key) => (filters[key] === undefined || filters[key] === null) && delete filters[key]
     );
+
+    console.log('🔍 Export filters being sent:', filters);
+    console.log('📊 Selected tenant info:', { selectedTenantId, selectedTenantName, apiStatus });
 
     startExport(filters);
   }, [apiStatus, selectedTenantId, selectedTenantName, startExport]);
