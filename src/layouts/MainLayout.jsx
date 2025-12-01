@@ -234,6 +234,8 @@ const MainLayout = () => {
                                 lastOrderState,
                                 handleSelectOrderState,
                                 isAggregated: selectedTenantId === null,
+                                allTenants: tenants,
+                                allMarketplaceTenants: marketplaceTenants,
                             }}
                         />
                     </main>
