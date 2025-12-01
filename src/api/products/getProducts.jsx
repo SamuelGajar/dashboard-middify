@@ -2,22 +2,42 @@ import { useEffect, useState } from "react";
 
 const API_URL = "https://957chi25kf.execute-api.us-east-2.amazonaws.com/dev/products";
 
-export const getProducts = async ({ token, signal } = {}) => {
-    const headers = {};
+export const getProducts = async ({ token, tenantId, tenantName, signal } = {}) => {
+    const headers = {
+        "Content-Type": "application/json",
+    };
+
     if (token) {
         headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(API_URL, {
+    // Construcción de query params
+    const queryParams = new URLSearchParams();
+
+    if (tenantId) queryParams.append("tenantId", tenantId);
+    if (tenantName) queryParams.append("tenantName", tenantName);
+
+    const url = `${API_URL}?${queryParams.toString()}`;
+
+    console.log("Fetching:", url);
+
+    const response = await fetch(url, {
+        method: "GET",
         headers,
         signal,
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+        throw new Error(result.message || `Error ${response.status}`);
+    }
+
     return result;
 };
 
-export const useProducts = (token) => {
+
+export const useProducts = (token, tenantId = null, tenantName = null) => {
     const [products, setProducts] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -32,6 +52,8 @@ export const useProducts = (token) => {
             try {
                 const data = await getProducts({
                     token,
+                    tenantId,
+                    tenantName,
                     signal: controller.signal,
                 });
                 if (isMounted) {
@@ -57,7 +79,7 @@ export const useProducts = (token) => {
             isMounted = false;
             controller.abort();
         };
-    }, [token]);
+    }, [token, tenantId, tenantName]);
 
     return { products, loading, error };
 };
