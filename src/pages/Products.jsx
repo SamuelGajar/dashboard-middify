@@ -4,6 +4,7 @@ import { useProducts } from "../api/products/getProducts";
 import { postExportProducts } from "../api/products/postExportProducts";
 import { DataGrid } from "@mui/x-data-grid";
 import Paper from "@mui/material/Paper";
+import { Snackbar, Alert } from "@mui/material";
 import ProductsTableHeader from "../components/products/productsTableHeadeer";
 
 const NoRowsOverlay = () => (
@@ -13,25 +14,43 @@ const NoRowsOverlay = () => (
 );
 
 const Products = () => {
-    const { token, selectedTenantId, selectedTenantName, user } = useOutletContext() || {};
+    const { token, selectedTenantId, selectedTenantName, user, resolvedProductState } = useOutletContext() || {};
 
     const [isExporting, setIsExporting] = useState(false);
     const [selectedRowIds, setSelectedRowIds] = useState(() => new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: "",
+        severity: "info",
+    });
 
     const { products, loading, error } = useProducts(
         token,
         selectedTenantId,
         selectedTenantName,
-        refreshTrigger
+        refreshTrigger,
+        resolvedProductState
     );
 
     const filteredProducts = useMemo(() => {
         if (!Array.isArray(products?.products)) {
             return [];
         }
-        return products.products.filter((product) => product.state !== "discard");
-    }, [products?.products]);
+
+        return products.products.filter((product) => {
+            // 1. Si hay un estado seleccionado en el sidebar
+            if (resolvedProductState) {
+                // Mapear 'descartada' a 'discard' si es necesario, o usar el valor directo
+                const targetState = resolvedProductState === "descartada" ? "discard" : resolvedProductState;
+                return product.state === targetState;
+            }
+
+            // 2. Si NO hay estado seleccionado (vista "Todos")
+            // Mostrar todo EXCEPTO los 'discard'
+            return product.state !== "discard";
+        });
+    }, [products?.products, resolvedProductState]);
 
     const rows = useMemo(() => {
         return filteredProducts.map((product, index) => ({
@@ -142,15 +161,15 @@ const Products = () => {
         };
 
         const dataColumns = [
-            { field: "sku", headerName: "SKU", width: 150 },
-            { field: "name", headerName: "Nombre", width: 250 },
-            { field: "tenantName", headerName: "Tenant", width: 150 },
-            { field: "warehouse", headerName: "Bodega", width: 150 },
-            { field: "quantity", headerName: "Cantidad", width: 100, type: "number" },
-            { field: "price", headerName: "Precio", width: 100, type: "number" },
-            { field: "state", headerName: "Estado", width: 120 },
-            { field: "sync", headerName: "Sincronizado", width: 120, type: "boolean" },
-        ];
+        { field: "sku", headerName: "SKU", width: 150 },
+        { field: "name", headerName: "Nombre", width: 250 },
+        { field: "tenantName", headerName: "Tenant", width: 150 },
+        { field: "warehouse", headerName: "Bodega", width: 150 },
+        { field: "quantity", headerName: "Cantidad", width: 100, type: "number" },
+        { field: "price", headerName: "Precio", width: 100, type: "number" },
+        { field: "state", headerName: "Estado", width: 120 },
+        { field: "sync", headerName: "Sincronizado", width: 120, type: "boolean" },
+    ];
 
         return [selectColumn, ...dataColumns];
     }, [allSelected, handleToggleAllRows, handleToggleRowSelection, selectedRowIds]);
@@ -168,10 +187,18 @@ const Products = () => {
             const response = await postExportProducts(token, body);
 
             if (response?.message) {
-                alert(response.message);
+                setSnackbar({
+                    open: true,
+                    message: response.message,
+                    severity: "success",
+                });
             }
         } catch (err) {
-            alert("Error al exportar productos. Por favor intenta de nuevo.");
+            setSnackbar({
+                open: true,
+                message: "Error al exportar productos. Por favor intenta de nuevo.",
+                severity: "error",
+            });
         } finally {
             setIsExporting(false);
         }
@@ -181,14 +208,14 @@ const Products = () => {
 
     const infoChips =
         filteredProducts && filteredProducts.length > 0
-            ? [
-                  {
-                      id: "total",
-                      label: "Total",
+        ? [
+              {
+                  id: "total",
+                  label: "Total",
                       value: filteredProducts.length,
-                  },
-              ]
-            : [];
+              },
+          ]
+        : [];
 
     if (error && !loading) {
         return (
@@ -283,6 +310,22 @@ const Products = () => {
                     </div>
                 </div>
             </div>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={3000}
+                onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+                    severity={snackbar.severity}
+                    sx={{ width: "100%" }}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </div>
     );
 };

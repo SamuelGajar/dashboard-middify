@@ -11,7 +11,6 @@ import { STATE_DEFINITIONS } from "../components/dashboard/CardsStates";
 const PRIMARY_NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", Icon: AssessmentIcon },
   { id: "stores", label: "Tiendas", Icon: ApartmentIcon },
-  { id: "products", label: "Productos", Icon: Inventory2Icon },
 ];
 
 const normalizeStateId = (value = "") =>
@@ -27,6 +26,14 @@ const ORDER_STATE_ITEMS = STATE_DEFINITIONS.map(({ key, label }) => {
     id === "en_proceso" ? "En proceso" : label ?? key;
   return { id, label: displayLabel };
 });
+
+const PRODUCT_STATE_ITEMS = [
+  { id: "ingresada", label: "Ingresada" },
+  { id: "pendiente", label: "Pendiente" },
+  { id: "procesada", label: "Procesada" },
+  { id: "error", label: "Error" },
+  { id: "en_proceso", label: "En proceso" },
+];
 
 export const SIDEBAR_WIDTH = 280;
 export const SIDEBAR_COLLAPSED_WIDTH = 84;
@@ -47,6 +54,8 @@ const Sidebar = ({
   showTenantFilter = true,
   activeOrderState = null,
   onChangeOrderState,
+  activeProductState = null,
+  onChangeProductState,
   isCollapsed = false,
   onToggleCollapse = () => { },
   isMobileOpen = false,
@@ -90,16 +99,21 @@ const Sidebar = ({
   }, [normalizedRole]);
 
   const [ordersExpanded, setOrdersExpanded] = useState(activeView === "orders");
+  const [productsExpanded, setProductsExpanded] = useState(activeView === "products");
   const effectiveCollapsed = isCollapsed && !isMobileOpen;
   const [tenantOpen, setTenantOpen] = useState(false);
 
   useEffect(() => {
     if (effectiveCollapsed) {
       setOrdersExpanded(false);
+      setProductsExpanded(false);
       return;
     }
     if (activeView === "orders") {
       setOrdersExpanded(true);
+    }
+    if (activeView === "products") {
+      setProductsExpanded(true);
     }
   }, [activeView, effectiveCollapsed]);
 
@@ -116,11 +130,20 @@ const Sidebar = ({
   }, [isMobileOpen]);
 
   const isOrdersRootActive = activeView === "orders" && !activeOrderState;
+  const isProductsRootActive = activeView === "products" && !activeProductState;
 
   const handleOrderRootClick = () => {
     handleViewChange("orders");
     if (typeof onChangeOrderState === "function") {
       onChangeOrderState(null);
+    }
+    closeMobileIfNeeded();
+  };
+
+  const handleProductRootClick = () => {
+    handleViewChange("products");
+    if (typeof onChangeProductState === "function") {
+      onChangeProductState(null);
     }
     closeMobileIfNeeded();
   };
@@ -133,12 +156,28 @@ const Sidebar = ({
     closeMobileIfNeeded();
   };
 
+  const handleProductStateClick = (stateId) => {
+    handleViewChange("products");
+    if (typeof onChangeProductState === "function") {
+      onChangeProductState(stateId);
+    }
+    closeMobileIfNeeded();
+  };
+
   const handleOrdersToggle = () => {
     if (effectiveCollapsed) {
       onToggleCollapse(false);
       return;
     }
     setOrdersExpanded((prev) => !prev);
+  };
+
+  const handleProductsToggle = () => {
+    if (effectiveCollapsed) {
+      onToggleCollapse(false);
+      return;
+    }
+    setProductsExpanded((prev) => !prev);
   };
 
   const renderSidebarBody = (collapsed) => {
@@ -151,25 +190,31 @@ const Sidebar = ({
 
     const primaryButtonClasses = (isActive) =>
       [
-        "relative flex w-full items-center rounded-2xl py-2.5 text-[13px] font-medium tracking-wide transition-all duration-200",
-        isActive ? "bg-white/12 border border-white/15 shadow-lg shadow-black/10" : "bg-transparent hover:bg-white/8 hover:border hover:border-white/10",
+        "relative flex w-full items-center rounded-2xl py-2.5 text-[13px] font-medium tracking-wide transition-colors duration-200",
+        isActive ? "bg-white/10 text-white shadow-sm" : "bg-transparent text-white/80 hover:bg-white/5 hover:text-white",
         collapsed ? "justify-center px-0" : "justify-start px-3.5 gap-3",
-        isActive ? "before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-6 before:w-1.5 before:rounded-r-full before:bg-white/90" : ""
       ]
         .filter(Boolean)
         .join(" ");
 
     const ordersButtonClasses = [
-      "relative flex w-full items-center rounded-2xl py-2.5 text-[13px] font-medium tracking-wide transition-all duration-200",
+      "relative flex w-full items-center rounded-2xl py-2.5 text-[13px] font-medium tracking-wide transition-colors duration-200",
       activeView === "orders" && ordersExpanded
-        ? "bg-white/12 border border-white/15 shadow-lg shadow-black/10"
-        : "bg-transparent hover:bg-white/8 hover:border hover:border-white/10",
+        ? "bg-white/10 text-white shadow-sm"
+        : "bg-transparent text-white/80 hover:bg-white/5 hover:text-white",
       collapsed ? "justify-center px-0" : "justify-between px-3.5",
-      activeView === "orders" && ordersExpanded ? "before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-6 before:w-1.5 before:rounded-r-full before:bg-white/90" : ""
+    ].join(" ");
+
+    const productsButtonClasses = [
+      "relative flex w-full items-center rounded-2xl py-2.5 text-[13px] font-medium tracking-wide transition-colors duration-200",
+      activeView === "products" && productsExpanded
+        ? "bg-white/10 text-white shadow-sm"
+        : "bg-transparent text-white/80 hover:bg-white/5 hover:text-white",
+      collapsed ? "justify-center px-0" : "justify-between px-3.5",
     ].join(" ");
 
     const renderIconWrapper = (icon, isActive) => (
-      <div className={`h-8 w-8 rounded-xl grid place-items-center transition-all duration-200 ${isActive ? "bg-white/15 text-white" : "bg-white/10 text-white/90"}`}>
+      <div className={`h-8 w-8 rounded-xl grid place-items-center transition-colors duration-200 ${isActive ? "bg-white/20 text-white" : "bg-white/5 text-white/70"}`}>
         {icon}
       </div>
     );
@@ -273,7 +318,7 @@ const Sidebar = ({
                       {renderIconWrapper(<Icon fontSize="small" />, isActive)}
                       {!collapsed && (
                         <span
-                          className={`transition-all duration-200 ${isActive ? "text-white font-semibold" : "text-white/90"
+                          className={`transition-colors duration-200 ${isActive ? "text-white font-semibold" : "text-white/80 group-hover:text-white"
                             }`}
                         >
                           {label}
@@ -282,6 +327,77 @@ const Sidebar = ({
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="space-y-2">
+                {!collapsed && (
+                  <>
+                    <p className="px-1 text-[10px] uppercase tracking-[0.14em] text-white/45">Inventario</p>
+                    <div className="my-2 h-px bg-white/10" />
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={handleProductsToggle}
+                  className={productsButtonClasses}
+                >
+                  <div
+                    className={`flex items-center ${collapsed ? "gap-0" : "gap-3"}`}
+                  >
+                    {renderIconWrapper(<Inventory2Icon fontSize="small" />, activeView === "products")}
+                    {!collapsed && (
+                      <span className={`transition-colors duration-200 ${activeView === "products" ? "text-white font-semibold" : "text-white/80 group-hover:text-white"
+                        }`}>
+                        Productos
+                      </span>
+                    )}
+                  </div>
+                  {!collapsed && (
+                    <ExpandMoreIcon
+                      className={`text-white/70 transition-all duration-300 ${productsExpanded ? "rotate-180" : ""
+                        }`}
+                      fontSize="small"
+                    />
+                  )}
+                </button>
+
+                {!collapsed && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${productsExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
+                  >
+                    <div className="ml-2 space-y-1 border-l border-white/15 pl-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleProductRootClick}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-200 ${isProductsRootActive
+                            ? "bg-white/10 font-medium text-white"
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
+                          }`}
+                      >
+                        <StatusDot active={isProductsRootActive} />
+                        <span>Todos</span>
+                      </button>
+                      {PRODUCT_STATE_ITEMS.map((state) => {
+                        const isActive = activeProductState === state.id;
+                        return (
+                          <button
+                            key={state.id}
+                            type="button"
+                            onClick={() => handleProductStateClick(state.id)}
+                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-200 ${isActive
+                                ? "bg-white/10 font-medium text-white"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
+                              }`}
+                          >
+                            <StatusDot active={isActive} />
+                            <span>{state.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -301,7 +417,7 @@ const Sidebar = ({
                   >
                     {renderIconWrapper(<Inventory2Icon fontSize="small" />, activeView === "orders")}
                     {!collapsed && (
-                      <span className={`transition-all duration-200 ${activeView === "orders" ? "text-white font-semibold" : "text-white/90"
+                      <span className={`transition-colors duration-200 ${activeView === "orders" ? "text-white font-semibold" : "text-white/80 group-hover:text-white"
                         }`}>
                         Órdenes
                       </span>
@@ -325,9 +441,9 @@ const Sidebar = ({
                       <button
                         type="button"
                         onClick={handleOrderRootClick}
-                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${isOrdersRootActive
-                            ? "bg-white/15 font-semibold text-white shadow shadow-black/10"
-                            : "text-white/80 hover:bg-white/10 hover:text-white"
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-200 ${isOrdersRootActive
+                            ? "bg-white/10 font-medium text-white"
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
                           }`}
                       >
                         <StatusDot active={isOrdersRootActive} />
@@ -340,9 +456,9 @@ const Sidebar = ({
                             key={state.id}
                             type="button"
                             onClick={() => handleOrderStateClick(state.id)}
-                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-1.5 text-sm transition-all duration-200 ${isActive
-                                ? "bg-white/15 font-semibold text-white shadow shadow-black/10"
-                                : "text-white/80 hover:bg-white/10 hover:text-white"
+                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-200 ${isActive
+                                ? "bg-white/10 font-medium text-white"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
                               }`}
                           >
                             <StatusDot active={isActive} />

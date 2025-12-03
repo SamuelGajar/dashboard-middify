@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 const API_URL = "https://957chi25kf.execute-api.us-east-2.amazonaws.com/dev/products";
 
-export const getProducts = async ({ token, tenantId, tenantName, signal } = {}) => {
+export const getProducts = async ({ token, tenantId, tenantName, state, signal } = {}) => {
     const headers = {
         "Content-Type": "application/json",
     };
@@ -16,6 +16,7 @@ export const getProducts = async ({ token, tenantId, tenantName, signal } = {}) 
 
     if (tenantId) queryParams.append("tenantId", tenantId);
     if (tenantName) queryParams.append("tenantName", tenantName);
+    if (state) queryParams.append("state", state); // Agregamos state
 
     const url = `${API_URL}?${queryParams.toString()}`;
 
@@ -37,7 +38,7 @@ export const getProducts = async ({ token, tenantId, tenantName, signal } = {}) 
 };
 
 
-export const useProducts = (token, tenantId = null, tenantName = null, refreshTrigger = 0) => {
+export const useProducts = (token, tenantId = null, tenantName = null, refreshTrigger = 0, state = null) => {
     const [products, setProducts] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -54,6 +55,7 @@ export const useProducts = (token, tenantId = null, tenantName = null, refreshTr
                     token,
                     tenantId,
                     tenantName,
+                    state, // Pasamos state
                     signal: controller.signal,
                 });
                 if (isMounted) {
@@ -79,7 +81,7 @@ export const useProducts = (token, tenantId = null, tenantName = null, refreshTr
             isMounted = false;
             controller.abort();
         };
-    }, [token, tenantId, tenantName, refreshTrigger]);
+    }, [token, tenantId, tenantName, refreshTrigger, state]);
 
     return { products, loading, error };
 };

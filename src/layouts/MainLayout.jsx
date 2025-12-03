@@ -7,9 +7,9 @@ import {
     useMatch,
     Outlet,
 } from "react-router-dom";
-import { useProductStates } from "../api/getProductStates";
+import { useProductStates } from "../api/products/getProductStates";
 import { useMarketplaceSummary } from "../api/getMarketplaceSummary";
-import { useUsers } from "../api/getUsers";
+import { useUsers } from "../api/users/getUsers";
 import Navbar from "../navbar/navbar";
 import Sidebar from "../navbar/sidebar";
 
@@ -54,6 +54,7 @@ const MainLayout = () => {
     const detailMatch = useMatch("/orders/:orderId");
     const detailOrderId = detailMatch?.params?.orderId ?? null;
     const resolvedOrderState = ensureOrderState(searchParams.get("state"));
+    const resolvedProductState = searchParams.get("productState");
 
     const [selectedTenantId, setSelectedTenantId] = useState(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -137,6 +138,17 @@ const MainLayout = () => {
         [navigate]
     );
 
+    const handleSelectProductState = useCallback(
+        (stateId) => {
+            if (stateId) {
+                navigate(`/products?productState=${encodeURIComponent(stateId)}`);
+            } else {
+                navigate("/products");
+            }
+        },
+        [navigate]
+    );
+
     const handleToggleSidebarCollapse = useCallback(() => {
         setIsSidebarCollapsed((prev) => !prev);
     }, []);
@@ -203,6 +215,8 @@ const MainLayout = () => {
                 showTenantFilter={true}
                 activeOrderState={sidebarOrderState}
                 onChangeOrderState={handleSelectOrderState}
+                activeProductState={resolvedProductState}
+                onChangeProductState={handleSelectProductState}
                 isCollapsed={isSidebarCollapsed}
                 onToggleCollapse={setIsSidebarCollapsed}
                 isMobileOpen={isSidebarOpen}
@@ -231,8 +245,10 @@ const MainLayout = () => {
                                 selectedTenantId,
                                 selectedTenantName,
                                 resolvedOrderState,
+                                resolvedProductState,
                                 lastOrderState,
                                 handleSelectOrderState,
+                                handleSelectProductState,
                                 isAggregated: selectedTenantId === null,
                                 allTenants: tenants,
                                 allMarketplaceTenants: marketplaceTenants,
