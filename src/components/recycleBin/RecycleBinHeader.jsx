@@ -98,3 +98,4 @@ RecycleBinHeader.defaultProps = {
 
 export default RecycleBinHeader;
 
+

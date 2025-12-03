@@ -6,10 +6,10 @@ import RecycleBinOrdersTab from "../components/recycleBin/RecycleBinOrdersTab";
 import RecycleBinProductsTab from "../components/recycleBin/RecycleBinProductsTab";
 
 const RecycleBin = ({
-    token = null,
-    selectedTenantId = null,
-    onSelectOrder = () => {},
-    user = null,
+  token = null,
+  selectedTenantId = null,
+  onSelectOrder = () => {},
+  user = null,
 }) => {
     const [activeTab, setActiveTab] = useState("orders");
 
@@ -25,7 +25,7 @@ const RecycleBin = ({
         setActiveTab(newTab);
     };
 
-    return (
+  return (
         <div className="flex flex-col gap-4 pt-4">
             <RecycleBinHeader
                 activeTab={activeTab}
@@ -48,10 +48,10 @@ const RecycleBin = ({
                     token={token}
                     selectedTenantId={selectedTenantId}
                     user={user}
-                />
+      />
             )}
-        </div>
-    );
+    </div>
+  );
 };
 
 RecycleBin.propTypes = {

@@ -37,6 +37,8 @@ const ProductsTableHeader = ({
     token,
     user,
     onDeleteSuccess,
+    tenantId,
+    tenantName,
 }) => {
     const canTriggerExport = typeof onExportData === "function" && !exportDisabled;
     const [isDeleting, setIsDeleting] = useState(false);
@@ -318,6 +320,15 @@ const ProductsTableHeader = ({
             <ImportProductsModal
                 open={showImportModal}
                 onClose={() => setShowImportModal(false)}
+                token={token}
+                tenantId={tenantId}
+                tenantName={tenantName}
+                onImportSuccess={(result) => {
+                    console.log("Importación exitosa:", result);
+                    if (typeof onDeleteSuccess === "function") {
+                        onDeleteSuccess(); // Reutilizamos para refrescar datos
+                    }
+                }}
             />
         </>
     );
@@ -342,6 +353,8 @@ ProductsTableHeader.propTypes = {
     token: PropTypes.string,
     user: PropTypes.object,
     onDeleteSuccess: PropTypes.func,
+    tenantId: PropTypes.string,
+    tenantName: PropTypes.string,
 };
 
 ProductsTableHeader.defaultProps = {
@@ -356,6 +369,8 @@ ProductsTableHeader.defaultProps = {
     token: null,
     user: null,
     onDeleteSuccess: undefined,
+    tenantId: null,
+    tenantName: null,
 };
 
 export default ProductsTableHeader;
