@@ -1,7 +1,6 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import OrdersTableGrid from "../orders/OrdersTableGrid";
-import OrdersTableHeader from "../orders/OrdersTableHeader";
 import DeleteOrdersModal from "../orders/DeleteOrdersModal";
 import { useOrdersTableLogic } from "../orders/useOrdersTableLogic";
 import { patchStateOrder } from "../../api/orders/patchStateOrder";
@@ -11,7 +10,13 @@ import { fetchOrdersByStateAllPages } from "../../api/orders/getOrdersByState";
 
 const numberFormatter = new Intl.NumberFormat("es-CL");
 
-const RecycleBinOrdersTab = ({ token, selectedTenantId, onSelectOrder, user }) => {
+const RecycleBinOrdersTab = ({
+    token,
+    selectedTenantId,
+    onSelectOrder,
+    user,
+    onHeaderPropsChange,
+}) => {
     const {
         error,
         grid,
@@ -249,32 +254,40 @@ const RecycleBinOrdersTab = ({ token, selectedTenantId, onSelectOrder, user }) =
         }
     }, [token, user, getSelectedOrderIds, pendingStatus, refreshData, clearSelection]);
 
+    useEffect(() => {
+        if (typeof onHeaderPropsChange === "function") {
+            onHeaderPropsChange({
+                ordersSelectedCount: selectedRowIds.length,
+                ordersTotalCount: grid.rowCount || 0,
+                ordersOnChangeState: handleStateSelection,
+                ordersIsProcessing: isUpdatingStatus,
+                ordersStateOptions: stateOptions,
+                ordersSelectedState: selectedStatusValue,
+                ordersOnExportData: handleExportDeletedOrders,
+                ordersIsExportingData: isExporting,
+                ordersExportDisabled: !token || grid.rowCount === 0,
+                ordersOnExportSelectedData: handleExportSelectedDeletedOrders,
+                ordersIsExportingSelectedData: isExportingSelection,
+                ordersExportSelectedDisabled: selectedRowIds.length === 0,
+            });
+        }
+    }, [
+        selectedRowIds.length,
+        grid.rowCount,
+        handleStateSelection,
+        isUpdatingStatus,
+        stateOptions,
+        selectedStatusValue,
+        handleExportDeletedOrders,
+        isExporting,
+        token,
+        handleExportSelectedDeletedOrders,
+        isExportingSelection,
+        onHeaderPropsChange,
+    ]);
+
     return (
         <div className="space-y-4">
-            <OrdersTableHeader
-                title="Órdenes Eliminadas"
-                infoChips={[
-                    {
-                        id: "deleted-total",
-                        label: "Total",
-                        value: numberFormatter.format(grid.rowCount || 0),
-                    },
-                ]}
-                selectedCount={selectedRowIds.length}
-                onChangeState={handleStateSelection}
-                isProcessing={isUpdatingStatus}
-                stateOptions={stateOptions}
-                selectedState={selectedStatusValue}
-                searchPlaceholder="Buscar por ID, mensaje, tienda..."
-                searchDisabled
-                onExportData={handleExportDeletedOrders}
-                isExportingData={isExporting}
-                exportDisabled={!token || grid.rowCount === 0}
-                onExportSelectedData={handleExportSelectedDeletedOrders}
-                isExportingSelectedData={isExportingSelection}
-                exportSelectedDisabled={selectedRowIds.length === 0}
-            />
-
             <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <OrdersTableGrid
                     rows={grid.rows}
@@ -308,6 +321,7 @@ RecycleBinOrdersTab.propTypes = {
     selectedTenantId: PropTypes.string,
     onSelectOrder: PropTypes.func,
     user: PropTypes.object,
+    onHeaderPropsChange: PropTypes.func,
 };
 
 RecycleBinOrdersTab.defaultProps = {
@@ -315,8 +329,10 @@ RecycleBinOrdersTab.defaultProps = {
     selectedTenantId: null,
     onSelectOrder: () => {},
     user: null,
+    onHeaderPropsChange: null,
 };
 
 export default RecycleBinOrdersTab;
+
 
 
