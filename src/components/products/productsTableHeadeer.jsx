@@ -1,9 +1,11 @@
 import PropTypes from "prop-types";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditIcon from "@mui/icons-material/Edit";
+import SyncIcon from "@mui/icons-material/Sync";
+import WarningIcon from "@mui/icons-material/Warning";
 import CircularProgress from "@mui/material/CircularProgress";
 import {
     Dialog,
@@ -18,6 +20,8 @@ import {
 } from "@mui/material";
 import { patchExportProducts } from "../../api/products/patchStateProduct";
 import ImportProductsModal from "./ImportProductsModal";
+import SyncSkuModal from "./SyncSkuModal";
+import { alertsProducts } from "../../utils/alertsProducts";
 
 const PRODUCT_STATES = [
     { value: "created", label: "Creada" },
@@ -25,14 +29,89 @@ const PRODUCT_STATES = [
     { value: "success", label: "Procesada" },
 ];
 
+// Funciones de normalización
+const normalizeUser = (user) => ({
+    email: user?.email || user?.mail || user?.username || "usuario",
+    name: user?.name || user?.username || user?.email || user?.mail || "usuario",
+});
+
+const validateSelection = (getSelectedProductIds) => {
+    if (!getSelectedProductIds || typeof getSelectedProductIds !== "function") {
+        throw new Error("No se puede obtener la lista de productos seleccionados.");
+    }
+    const ids = getSelectedProductIds();
+    if (ids.length === 0) {
+        throw new Error("Selecciona al menos un producto.");
+    }
+    return ids;
+};
+
+const validateAuth = (token, user) => {
+    if (!token) throw new Error("No hay token de autenticación disponible.");
+    if (!user) throw new Error("No hay información de usuario disponible.");
+};
+
+// Componente de botón reutilizable
+const ActionButton = ({
+    icon: Icon,
+    label,
+    onClick,
+    disabled,
+    variant = "default",
+    loading,
+    loadingLabel,
+    className = "",
+    ...props
+}) => {
+    const variants = {
+        default: "border-slate-200 text-slate-700 hover:border-indigo-500 hover:text-indigo-600 focus:ring-indigo-500",
+        danger: "border-red-200 text-red-600 hover:border-red-500 hover:bg-red-50 hover:text-red-700 focus:ring-red-500",
+        success: "border-slate-200 text-slate-700 hover:border-green-500 hover:text-green-600 focus:ring-green-500",
+        primary: "border-slate-200 text-slate-700 hover:border-indigo-500 hover:text-indigo-600 focus:ring-indigo-500",
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={`flex w-full items-center justify-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${variants[variant]} ${className}`}
+            {...props}
+        >
+            {loading ? (
+                <>
+                    <CircularProgress size={14} />
+                    {loadingLabel}
+                </>
+            ) : (
+                <>
+                    {Icon && <Icon sx={{ fontSize: 16 }} />}
+                    {label}
+                </>
+            )}
+        </button>
+    );
+};
+
+ActionButton.propTypes = {
+    icon: PropTypes.elementType,
+    label: PropTypes.string.isRequired,
+    onClick: PropTypes.func.isRequired,
+    disabled: PropTypes.bool,
+    variant: PropTypes.oneOf(["default", "danger", "success", "primary"]),
+    loading: PropTypes.bool,
+    loadingLabel: PropTypes.string,
+    className: PropTypes.string,
+};
+
 const ProductsTableHeader = ({
-    title,
+    title = "Productos",
     subtitle,
-    infoChips,
+    infoChips = [],
     onExportData,
-    isExportingData,
-    exportDisabled,
-    selectedCount,
+    isExportingData = false,
+    exportDisabled = false,
+    selectedCount = 0,
     getSelectedProductIds,
     token,
     user,
@@ -40,141 +119,87 @@ const ProductsTableHeader = ({
     tenantId,
     tenantName,
 }) => {
-    const canTriggerExport = typeof onExportData === "function" && !exportDisabled;
     const [isDeleting, setIsDeleting] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [showSyncModal, setShowSyncModal] = useState(false);
     const [selectedState, setSelectedState] = useState("");
+
     const hasSelection = selectedCount > 0;
+    const canTriggerExport = typeof onExportData === "function" && !exportDisabled;
+    const isLoading = isDeleting || isUpdating;
 
-    const handleUpdateState = async () => {
+    // Función genérica para actualizar estado de productos
+    const updateProductsState = useCallback(
+        async (state) => {
+            try {
+                const selectedIds = validateSelection(getSelectedProductIds);
+                validateAuth(token, user);
+
+                const { email, name } = normalizeUser(user);
+                await patchExportProducts({
+                    token,
+                    ids: selectedIds,
+                    state,
+                    user: name,
+                    mailUser: email,
+                });
+
+                onDeleteSuccess?.();
+                return { success: true, count: selectedIds.length };
+            } catch (error) {
+                console.error(`Error al actualizar productos:`, error);
+                throw error;
+            }
+        },
+        [getSelectedProductIds, token, user, onDeleteSuccess]
+    );
+
+    const handleUpdateState = useCallback(async () => {
         if (!selectedState) {
-            alert("Por favor selecciona un estado.");
-            return;
-        }
-
-        if (!getSelectedProductIds || typeof getSelectedProductIds !== "function") {
-            alert("Error: No se puede obtener la lista de productos seleccionados.");
-            return;
-        }
-
-        const selectedIds = getSelectedProductIds();
-        if (selectedIds.length === 0) {
-            alert("Selecciona al menos un producto para actualizar.");
-            return;
-        }
-
-        if (!token) {
-            alert("Error: No hay token de autenticación disponible.");
-            return;
-        }
-
-        if (!user) {
-            alert("Error: No hay información de usuario disponible.");
+            alertsProducts.selectState();
             return;
         }
 
         setIsUpdating(true);
         try {
-            const userEmail = user.email || user.mail || user.username || "usuario";
-            const userName = user.name || user.username || userEmail;
-
-            await patchExportProducts({
-                token,
-                ids: selectedIds,
-                state: selectedState,
-                user: userName,
-                mailUser: userEmail,
-            });
-
-            if (typeof onDeleteSuccess === "function") {
-                onDeleteSuccess(); // Reutilizamos el callback de éxito
-            }
+            const result = await updateProductsState(selectedState);
             setShowUpdateModal(false);
             setSelectedState("");
-            alert(`${selectedIds.length} producto(s) actualizado(s) correctamente.`);
-        } catch (err) {
-            console.error("Error al actualizar productos:", err);
-            alert(
-                `Error al actualizar los productos: ${err.message || "Error desconocido"}`
-            );
+            alertsProducts.updateSuccess(result.count);
+        } catch (error) {
+            alertsProducts.updateError(error.message);
         } finally {
             setIsUpdating(false);
         }
-    };
+    }, [selectedState, updateProductsState]);
 
-    const handleDeleteSelected = async () => {
-        if (!getSelectedProductIds || typeof getSelectedProductIds !== "function") {
-            alert("Error: No se puede obtener la lista de productos seleccionados.");
-            return;
-        }
+    const handleDeleteClick = useCallback(() => {
+        setShowDeleteModal(true);
+    }, []);
 
-        const selectedIds = getSelectedProductIds();
-        if (selectedIds.length === 0) {
-            alert("Selecciona al menos un producto para eliminar.");
-            return;
-        }
-
-        if (!token) {
-            alert("Error: No hay token de autenticación disponible.");
-            return;
-        }
-
-        if (!user) {
-            alert("Error: No hay información de usuario disponible.");
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `¿Estás seguro de que deseas eliminar ${selectedIds.length} producto(s)? Esta acción cambiará el estado a "discard".`
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
+    const handleConfirmDelete = useCallback(async () => {
+        setShowDeleteModal(false);
         setIsDeleting(true);
         try {
-            const userEmail = user.email || user.mail || user.username || "usuario";
-            const userName = user.name || user.username || userEmail;
-
-            console.log("Eliminando productos:", {
-                ids: selectedIds,
-                state: "discard",
-                user: userName,
-                mailUser: userEmail,
-                token: token ? "presente" : "ausente",
-            });
-
-            const response = await patchExportProducts({
-                token,
-                ids: selectedIds,
-                state: "discard",
-                user: userName,
-                mailUser: userEmail,
-            });
-
-            console.log("Respuesta de eliminación:", response);
-
-            if (typeof onDeleteSuccess === "function") {
-                onDeleteSuccess();
-            }
-            alert(`${selectedIds.length} producto(s) eliminado(s) correctamente.`);
-        } catch (err) {
-            console.error("Error al eliminar productos:", err);
-            console.error("Detalles del error:", {
-                message: err.message,
-                name: err.name,
-                stack: err.stack,
-            });
-            alert(
-                `Error al eliminar los productos: ${err.message || "Error desconocido"}`
-            );
+            const result = await updateProductsState("discard");
+            alertsProducts.deleteSuccess(result.count);
+        } catch (error) {
+            alertsProducts.deleteError(error.message);
         } finally {
             setIsDeleting(false);
         }
-    };
+    }, [updateProductsState]);
+
+    const handleModalSuccess = useCallback(
+        (result) => {
+            console.log("Operación exitosa:", result);
+            onDeleteSuccess?.();
+        },
+        [onDeleteSuccess]
+    );
 
     return (
         <>
@@ -183,102 +208,78 @@ const ProductsTableHeader = ({
                     <div className="flex flex-col gap-2">
                         <div className="flex items-baseline gap-3">
                             <h1 className="text-lg font-semibold text-slate-800">{title}</h1>
-                        {subtitle ? (
-                                <p className="text-xs text-slate-500">{subtitle}</p>
-                        ) : null}
-                    </div>
-                    {Array.isArray(infoChips) && infoChips.length > 0 ? (
-                            <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
-                            {infoChips.map((chip) => (
-                                <div
-                                    key={chip.id}
-                                        className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1"
-                                >
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                                        {chip.label}
-                                    </span>
-                                    <span
-                                            className={`text-xs font-semibold text-slate-700 ${chip.accentClass ?? ""}`}
-                                    >
-                                        {chip.value}
-                                    </span>
-                                </div>
-                            ))}
+                            {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
                         </div>
-                    ) : null}
-                </div>
-                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                        {hasSelection && (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowUpdateModal(true)}
-                                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-500 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                    disabled={isUpdating || isDeleting}
-                                >
-                                    <EditIcon sx={{ fontSize: 16 }} />
-                                    Cambiar Estado
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteSelected}
-                                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm transition hover:border-red-500 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                    disabled={isDeleting || isUpdating}
-                                    aria-label={`Eliminar ${selectedCount} producto(s) seleccionado(s)`}
-                                    title={`Eliminar ${selectedCount} producto(s) seleccionado(s)`}
-                                >
-                                    {isDeleting ? (
-                                        <>
-                                            <CircularProgress size={14} />
-                                            Eliminando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                                            Eliminar ({selectedCount})
-                                        </>
-                                    )}
-                                </button>
-                            </>
+                        {infoChips.length > 0 && (
+                            <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
+                                {infoChips.map((chip) => (
+                                    <div
+                                        key={chip.id}
+                                        className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1"
+                                    >
+                                        <span className="text-[10px] uppercase tracking-wider text-slate-400">
+                                            {chip.label}
+                                        </span>
+                                        <span
+                                            className={`text-xs font-semibold text-slate-700 ${chip.accentClass ?? ""}`}
+                                        >
+                                            {chip.value}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-                    <button
-                        type="button"
+                    </div>
+                </div>
+
+                <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    {hasSelection && (
+                        <>
+                            <ActionButton
+                                icon={EditIcon}
+                                label="Cambiar Estado"
+                                onClick={() => setShowUpdateModal(true)}
+                                disabled={isLoading}
+                                variant="default"
+                            />
+                            <ActionButton
+                                icon={DeleteOutlineIcon}
+                                label={`Eliminar (${selectedCount})`}
+                                onClick={handleDeleteClick}
+                                disabled={isLoading}
+                                variant="danger"
+                                loading={isDeleting}
+                                loadingLabel="Eliminando..."
+                                aria-label={`Eliminar ${selectedCount} producto(s) seleccionado(s)`}
+                            />
+                        </>
+                    )}
+                    <ActionButton
+                        icon={FileUploadOutlinedIcon}
+                        label="Importar"
                         onClick={() => setShowImportModal(true)}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-green-500 hover:text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                        variant="success"
                         aria-label="Importar productos desde archivo"
-                        title="Importar productos desde archivo"
-                    >
-                        <FileUploadOutlinedIcon sx={{ fontSize: 16 }} />
-                        Importar
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (!canTriggerExport || isExportingData) {
-                                return;
-                            }
-                            onExportData();
-                        }}
-                            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-catalina-blue-500 hover:text-catalina-blue-600 focus:outline-none focus:ring-2 focus:ring-catalina-blue-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                    />
+                    <ActionButton
+                        icon={SyncIcon}
+                        label="Sincronizar SKU"
+                        onClick={() => setShowSyncModal(true)}
+                        variant="primary"
+                        aria-label="Sincronizar SKU"
+                    />
+                    <ActionButton
+                        icon={FileDownloadOutlinedIcon}
+                        label="Exportar"
+                        onClick={onExportData}
                         disabled={!canTriggerExport || isExportingData}
+                        variant="default"
+                        loading={isExportingData}
+                        loadingLabel="Exportando..."
                         aria-label="Exportar productos a Excel"
-                        title="Exportar productos a Excel"
-                    >
-                        {isExportingData ? (
-                            <>
-                                    <CircularProgress size={14} />
-                                Exportando...
-                            </>
-                        ) : (
-                            <>
-                                    <FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />
-                                Exportar
-                            </>
-                        )}
-                    </button>
+                    />
                 </div>
-            </div>
-        </header>
+            </header>
 
             <Dialog open={showUpdateModal} onClose={() => setShowUpdateModal(false)}>
                 <DialogTitle>Cambiar estado de productos</DialogTitle>
@@ -317,18 +318,51 @@ const ProductsTableHeader = ({
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
+                <DialogTitle className="flex items-center gap-2">
+                    <WarningIcon className="text-red-600" />
+                    Confirmar eliminación
+                </DialogTitle>
+                <DialogContent className="min-w-[300px] pt-4">
+                    <p className="text-sm text-slate-700">
+                        ¿Estás seguro de que deseas eliminar <strong>{selectedCount}</strong> producto(s)?
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                        Esta acción cambiará el estado a "discard" y los productos no se mostrarán en la tabla principal.
+                    </p>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowDeleteModal(false)} color="inherit" disabled={isDeleting}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        variant="contained"
+                        color="error"
+                        disabled={isDeleting}
+                        startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+                    >
+                        {isDeleting ? "Eliminando..." : "Eliminar"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <ImportProductsModal
                 open={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 token={token}
                 tenantId={tenantId}
                 tenantName={tenantName}
-                onImportSuccess={(result) => {
-                    console.log("Importación exitosa:", result);
-                    if (typeof onDeleteSuccess === "function") {
-                        onDeleteSuccess(); // Reutilizamos para refrescar datos
-                    }
-                }}
+                onImportSuccess={handleModalSuccess}
+            />
+
+            <SyncSkuModal
+                open={showSyncModal}
+                onClose={() => setShowSyncModal(false)}
+                token={token}
+                tenantId={tenantId}
+                tenantName={tenantName}
+                onSyncSuccess={handleModalSuccess}
             />
         </>
     );
@@ -355,22 +389,6 @@ ProductsTableHeader.propTypes = {
     onDeleteSuccess: PropTypes.func,
     tenantId: PropTypes.string,
     tenantName: PropTypes.string,
-};
-
-ProductsTableHeader.defaultProps = {
-    title: "Productos",
-    subtitle: "",
-    infoChips: [],
-    onExportData: undefined,
-    isExportingData: false,
-    exportDisabled: false,
-    selectedCount: 0,
-    getSelectedProductIds: undefined,
-    token: null,
-    user: null,
-    onDeleteSuccess: undefined,
-    tenantId: null,
-    tenantName: null,
 };
 
 export default ProductsTableHeader;

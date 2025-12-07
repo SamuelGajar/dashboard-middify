@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import {
     Dialog,
@@ -7,10 +7,6 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel,
     CircularProgress,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
@@ -20,168 +16,233 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { postImportProducts } from "../../api/products/importProducts";
 
-const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImportSuccess }) => {
+const ACCEPTED_FORMATS = [".xlsx", ".xls", ".csv", ".json"];
+
+// Funciones de normalización
+const getFileExtension = (fileName) => fileName.split(".").pop().toLowerCase();
+
+const normalizeColumn = (row, variants) => {
+    for (const variant of variants) {
+        const value = row[variant] || row[variant.toUpperCase()] || row[variant.toLowerCase()];
+        if (value !== undefined && value !== null && value !== "") return value;
+    }
+    return "";
+};
+
+const mapProductRow = (row, index = null) => {
+    const sku = normalizeColumn(row, ["SKUSIMPLE", "SKU SIMPLE", "SKU", "sku", "Sku"]);
+    if (!sku) {
+        throw new Error(index !== null ? `Fila ${index + 2}: SKU es requerido` : "SKU es requerido");
+    }
+
+    const tipoOperacion = normalizeColumn(row, [
+        "TIPO_OPERACION",
+        "Tipo Operacion",
+        "TIPO OPERACION",
+        "tipo_operacion",
+    ]);
+
+    if (!tipoOperacion) {
+        throw new Error(
+            index !== null
+                ? `Fila ${index + 2}: TIPO_OPERACION es requerido (AGREGAR_STOCK, DESCONTAR_STOCK, CARGA_COMPLETA)`
+                : "TIPO_OPERACION es requerido"
+        );
+    }
+
+    return {
+        SKUSIMPLE: sku,
+        STOCK: parseInt(normalizeColumn(row, ["STOCK", "Stock", "stock", "Cantidad", "cantidad"]) || 0),
+        TIPO_OPERACION: tipoOperacion,
+        MARCA: normalizeColumn(row, [
+            "MARCA",
+            "Marca",
+            "marca",
+            "BODEGA",
+            "Bodega",
+            "bodega",
+            "WAREHOUSE",
+            "Warehouse",
+            "warehouse",
+        ]),
+    };
+};
+
+const parseJsonFile = async (file) => {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const products = Array.isArray(json) ? json : [json];
+    return products.map((p) => mapProductRow(p));
+};
+
+const parseExcelFile = async (file) => {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+    if (!jsonData || jsonData.length === 0) {
+        throw new Error("El archivo está vacío o no tiene datos válidos.");
+    }
+
+    return jsonData.map((row, index) => mapProductRow(row, index));
+};
+
+const parseFile = async (file) => {
+    const extension = getFileExtension(file.name);
+    if (extension === "json") return await parseJsonFile(file);
+    if (["xlsx", "xls", "csv"].includes(extension)) return await parseExcelFile(file);
+    throw new Error(`Formato no soportado. Usa ${ACCEPTED_FORMATS.join(", ")}`);
+};
+
+// Componentes reutilizables
+const AlertMessage = ({ type, icon: Icon, title, message, children }) => {
+    const styles = {
+        error: "border-red-200 bg-red-50 text-red-600",
+        success: "border-green-200 bg-green-50 text-green-600",
+        warning: "border-yellow-200 bg-yellow-50 text-yellow-600",
+        info: "border-blue-200 bg-blue-50 text-blue-600",
+    };
+
+    return (
+        <div className={`rounded-lg border p-3 ${styles[type]}`}>
+            <div className="flex items-start gap-2">
+                {Icon && <Icon sx={{ fontSize: 20 }} className={styles[type].split(" ")[2]} />}
+                <div className="flex-1">
+                    {title && <p className="text-xs font-semibold">{title}</p>}
+                    {message && <p className="text-xs">{message}</p>}
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+AlertMessage.propTypes = {
+    type: PropTypes.oneOf(["error", "success", "warning", "info"]).isRequired,
+    icon: PropTypes.elementType,
+    title: PropTypes.string,
+    message: PropTypes.string,
+    children: PropTypes.node,
+};
+
+const FilePreview = ({ data, columns, maxRows = 5 }) => (
+    <div className="max-h-32 overflow-y-auto rounded border border-green-200 bg-white p-2">
+        <table className="w-full text-xs">
+            <thead className="border-b border-slate-200">
+                <tr>
+                    {columns.map((col) => (
+                        <th key={col.key} className="px-2 py-1 text-left text-slate-700">
+                            {col.label}
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody>
+                {data.slice(0, maxRows).map((row, index) => (
+                    <tr key={index} className="border-b border-slate-100">
+                        {columns.map((col) => (
+                            <td key={col.key} className="px-2 py-1 text-slate-600">
+                                {row[col.key]}
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+        {data.length > maxRows && (
+            <p className="mt-2 text-center text-xs text-slate-500">
+                + {data.length - maxRows} producto(s) más...
+            </p>
+        )}
+    </div>
+);
+
+FilePreview.propTypes = {
+    data: PropTypes.array.isRequired,
+    columns: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.string.isRequired,
+            label: PropTypes.string.isRequired,
+        })
+    ).isRequired,
+    maxRows: PropTypes.number,
+};
+
+const ImportProductsModal = ({
+    open,
+    onClose,
+    token = null,
+    tenantId = null,
+    tenantName = null,
+    onImportSuccess = null,
+}) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [parsedData, setParsedData] = useState(null);
     const [parseError, setParseError] = useState(null);
     const [isImporting, setIsImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
-    const [operation, setOperation] = useState("AGREGAR_STOCK");
 
-    const parseFile = async (file) => {
+    const resetState = useCallback(() => {
+        setSelectedFile(null);
+        setParsedData(null);
+        setParseError(null);
+        setImportResult(null);
+    }, []);
+
+    const handleFileProcess = useCallback(async (file) => {
         setParseError(null);
         setParsedData(null);
-
         try {
-            const extension = file.name.split(".").pop().toLowerCase();
-
-            if (extension === "json") {
-                // Leer JSON
-                const text = await file.text();
-                const json = JSON.parse(text);
-                
-                // Validar que sea un array
-                const products = Array.isArray(json) ? json : [json];
-                
-                // Mapear a estructura esperada si tiene formato diferente
-                const mapped = products.map((p) => ({
-                    SKUSIMPLE: p.SKUSIMPLE || p.sku || p.SKU,
-                    STOCK: parseInt(p.STOCK || p.stock || p.cantidad || 0),
-                    TIPO_OPERACION: p.TIPO_OPERACION || operation,
-                    MARCA: p.MARCA || p.warehouse || p.bodega || "",
-                }));
-
-                setParsedData(mapped);
-            } else if (["xlsx", "xls", "csv"].includes(extension)) {
-                // Leer Excel o CSV
-                const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data, { type: "array" });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-                if (!jsonData || jsonData.length === 0) {
-                    throw new Error("El archivo está vacío o no tiene datos válidos.");
-                }
-
-                // Mapear columnas (flexibilidad en nombres)
-                const mapped = jsonData.map((row, index) => {
-                    const sku =
-                        row.SKUSIMPLE ||
-                        row.SKU ||
-                        row.sku ||
-                        row["SKU SIMPLE"] ||
-                        row.Sku ||
-                        "";
-
-                    const stock =
-                        row.STOCK ||
-                        row.Stock ||
-                        row.stock ||
-                        row.Cantidad ||
-                        row.cantidad ||
-                        0;
-
-                    const marca =
-                        row.MARCA ||
-                        row.Marca ||
-                        row.marca ||
-                        row.BODEGA ||
-                        row.Bodega ||
-                        row.bodega ||
-                        row.WAREHOUSE ||
-                        row.Warehouse ||
-                        row.warehouse ||
-                        "";
-
-                    if (!sku) {
-                        throw new Error(`Fila ${index + 2}: SKU es requerido`);
-                    }
-
-                    return {
-                        SKUSIMPLE: sku,
-                        STOCK: parseInt(stock),
-                        TIPO_OPERACION: operation, // Se usa la operación seleccionada
-                        MARCA: marca,
-                    };
-                });
-
-                setParsedData(mapped);
-            } else {
-                throw new Error("Formato de archivo no soportado. Usa .xlsx, .xls, .csv o .json");
-            }
+            const data = await parseFile(file);
+            setParsedData(data);
         } catch (error) {
             console.error("Error al parsear archivo:", error);
             setParseError(error.message);
-            setParsedData(null);
         }
-    };
+    }, []);
 
-    const handleFileSelect = (event) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            parseFile(file);
-        }
-    };
+    const handleFileSelect = useCallback(
+        (event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+                setSelectedFile(file);
+                handleFileProcess(file);
+            }
+        },
+        [handleFileProcess]
+    );
 
-    const handleDragOver = (event) => {
-        event.preventDefault();
-        setIsDragging(true);
-    };
+    const handleDrop = useCallback(
+        (event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            const file = event.dataTransfer.files?.[0];
+            if (file) {
+                setSelectedFile(file);
+                handleFileProcess(file);
+            }
+        },
+        [handleFileProcess]
+    );
 
-    const handleDragLeave = (event) => {
-        event.preventDefault();
-        setIsDragging(false);
-    };
-
-    const handleDrop = (event) => {
-        event.preventDefault();
-        setIsDragging(false);
-        const file = event.dataTransfer.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            parseFile(file);
-        }
-    };
-
-    const handleRemoveFile = () => {
-        setSelectedFile(null);
-        setParsedData(null);
-        setParseError(null);
-        setImportResult(null);
-    };
-
-    const handleClose = () => {
-        setSelectedFile(null);
-        setParsedData(null);
-        setParseError(null);
-        setImportResult(null);
-        setOperation("AGREGAR_STOCK");
+    const handleClose = useCallback(() => {
+        resetState();
         onClose();
-    };
+    }, [resetState, onClose]);
 
-    const handleOperationChange = (newOperation) => {
-        setOperation(newOperation);
-        // Re-parsear archivo con la nueva operación si ya hay uno seleccionado
-        if (selectedFile && parsedData) {
-            parseFile(selectedFile);
-        }
-    };
-
-    const handleImport = async () => {
-        if (!parsedData || parsedData.length === 0) {
+    const handleImport = useCallback(async () => {
+        if (!parsedData?.length) {
             alert("No hay datos válidos para importar.");
             return;
         }
-
         if (!token) {
-            alert("Error: No hay token de autenticación disponible.");
+            alert("No hay token de autenticación disponible.");
             return;
         }
-
         if (!tenantId || !tenantName) {
-            alert("Error: Se requiere información del tenant.");
+            alert("Se requiere información del tenant.");
             return;
         }
 
@@ -197,9 +258,8 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
             });
 
             setImportResult(response);
-
-            if (response.success && typeof onImportSuccess === "function") {
-                onImportSuccess(response);
+            if (response.success) {
+                onImportSuccess?.(response);
             }
         } catch (error) {
             console.error("Error al importar productos:", error);
@@ -207,7 +267,14 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
         } finally {
             setIsImporting(false);
         }
-    };
+    }, [parsedData, token, tenantId, tenantName, onImportSuccess]);
+
+    const previewColumns = [
+        { key: "SKUSIMPLE", label: "SKU" },
+        { key: "STOCK", label: "Stock" },
+        { key: "TIPO_OPERACION", label: "Operación" },
+        { key: "MARCA", label: "Bodega" },
+    ];
 
     return (
         <Dialog
@@ -215,16 +282,10 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
             onClose={handleClose}
             maxWidth="sm"
             fullWidth
-            PaperProps={{
-                sx: {
-                    borderRadius: "12px",
-                },
-            }}
+            PaperProps={{ sx: { borderRadius: "12px" } }}
         >
             <DialogTitle className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <span className="text-lg font-semibold text-slate-800">
-                    Importar Productos
-                </span>
+                <span className="text-lg font-semibold text-slate-800">Importar Productos</span>
                 <button
                     onClick={handleClose}
                     className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
@@ -235,38 +296,31 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
 
             <DialogContent className="pt-6">
                 <div className="space-y-4">
-                    {/* Tipo de Operación */}
-                    <FormControl fullWidth size="small">
-                        <InputLabel id="operation-select-label">Tipo de Operación</InputLabel>
-                        <Select
-                            labelId="operation-select-label"
-                            value={operation}
-                            label="Tipo de Operación"
-                            onChange={(e) => handleOperationChange(e.target.value)}
-                            disabled={isImporting}
-                        >
-                            <MenuItem value="AGREGAR_STOCK">Agregar Stock</MenuItem>
-                            <MenuItem value="DESCONTAR_STOCK">Descontar Stock</MenuItem>
-                            <MenuItem value="CARGA_COMPLETA">Carga Completa</MenuItem>
-                        </Select>
-                    </FormControl>
+                    <AlertMessage
+                        type="info"
+                        message={
+                            <>
+                                <strong>Formatos aceptados:</strong> Excel (.xlsx, .xls), CSV (.csv) o JSON (.json)
+                                <br />
+                                <strong>El archivo debe incluir:</strong> SKUSIMPLE, STOCK, TIPO_OPERACION (AGREGAR_STOCK, DESCONTAR_STOCK, CARGA_COMPLETA), MARCA
+                            </>
+                        }
+                    />
 
-                    {/* Información */}
-                    <div className="rounded-lg bg-blue-50 p-3">
-                        <p className="text-sm text-blue-700">
-                            <strong>Formatos aceptados:</strong> Excel (.xlsx, .xls), CSV (.csv) o JSON (.json)
-                        </p>
-                    </div>
-
-                    {/* Área de carga de archivo */}
                     <div
                         className={`relative rounded-xl border-2 border-dashed p-8 text-center transition ${
                             isDragging
                                 ? "border-indigo-500 bg-indigo-50"
                                 : "border-slate-300 bg-slate-50 hover:border-slate-400"
                         }`}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDragging(true);
+                        }}
+                        onDragLeave={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                        }}
                         onDrop={handleDrop}
                     >
                         {!selectedFile ? (
@@ -278,9 +332,7 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                                 <p className="mb-2 text-sm font-medium text-slate-700">
                                     Arrastra y suelta tu archivo aquí
                                 </p>
-                                <p className="mb-4 text-xs text-slate-500">
-                                    o haz clic en el botón de abajo
-                                </p>
+                                <p className="mb-4 text-xs text-slate-500">o haz clic en el botón de abajo</p>
                                 <label
                                     htmlFor="file-upload"
                                     className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -291,7 +343,7 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                                 <input
                                     id="file-upload"
                                     type="file"
-                                    accept=".xlsx,.xls,.csv,.json"
+                                    accept={ACCEPTED_FORMATS.join(",")}
                                     onChange={handleFileSelect}
                                     className="hidden"
                                 />
@@ -312,7 +364,11 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                                     </div>
                                 </div>
                                 <button
-                                    onClick={handleRemoveFile}
+                                    onClick={() => {
+                                        setSelectedFile(null);
+                                        setParsedData(null);
+                                        setParseError(null);
+                                    }}
                                     className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-red-600"
                                 >
                                     <CloseIcon fontSize="small" />
@@ -321,90 +377,31 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                         )}
                     </div>
 
-                    {/* Error de parseo */}
                     {parseError && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                            <div className="flex items-start gap-2">
-                                <ErrorIcon className="text-red-600" sx={{ fontSize: 20 }} />
-                                <div>
-                                    <p className="text-xs font-semibold text-red-700">
-                                        Error al leer el archivo
-                                    </p>
-                                    <p className="text-xs text-red-600">{parseError}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <AlertMessage
+                            type="error"
+                            icon={ErrorIcon}
+                            title="Error al leer el archivo"
+                            message={parseError}
+                        />
                     )}
 
-                    {/* Preview de datos parseados */}
                     {parsedData && parsedData.length > 0 && !importResult && (
-                        <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                                <CheckCircleIcon className="text-green-600" sx={{ fontSize: 20 }} />
-                                <p className="text-xs font-semibold text-green-700">
-                                    {parsedData.length} producto(s) detectado(s)
-                                </p>
-                            </div>
-                            <div className="max-h-32 overflow-y-auto rounded border border-green-200 bg-white p-2">
-                                <table className="w-full text-xs">
-                                    <thead className="border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-2 py-1 text-left text-slate-700">SKU</th>
-                                            <th className="px-2 py-1 text-left text-slate-700">Stock</th>
-                                            <th className="px-2 py-1 text-left text-slate-700">Bodega</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {parsedData.slice(0, 5).map((product, index) => (
-                                            <tr key={index} className="border-b border-slate-100">
-                                                <td className="px-2 py-1 text-slate-600">
-                                                    {product.SKUSIMPLE}
-                                                </td>
-                                                <td className="px-2 py-1 text-slate-600">
-                                                    {product.STOCK}
-                                                </td>
-                                                <td className="px-2 py-1 text-slate-600">
-                                                    {product.MARCA}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {parsedData.length > 5 && (
-                                    <p className="mt-2 text-center text-xs text-slate-500">
-                                        + {parsedData.length - 5} producto(s) más...
-                                    </p>
-                                )}
-                            </div>
-                        </div>
+                        <AlertMessage type="success" icon={CheckCircleIcon}>
+                            <p className="mb-2 text-xs font-semibold">
+                                {parsedData.length} producto(s) detectado(s)
+                            </p>
+                            <FilePreview data={parsedData} columns={previewColumns} />
+                        </AlertMessage>
                     )}
 
-                    {/* Resultado de importación */}
                     {importResult && (
-                        <div
-                            className={`rounded-lg border p-3 ${
-                                importResult.success && importResult.failed === 0
-                                    ? "border-green-200 bg-green-50"
-                                    : "border-yellow-200 bg-yellow-50"
-                            }`}
+                        <AlertMessage
+                            type={importResult.success && importResult.failed === 0 ? "success" : "warning"}
+                            icon={importResult.success && importResult.failed === 0 ? CheckCircleIcon : ErrorIcon}
+                            title="Importación completada"
                         >
-                            <div className="mb-2 flex items-center gap-2">
-                                {importResult.success && importResult.failed === 0 ? (
-                                    <CheckCircleIcon
-                                        className="text-green-600"
-                                        sx={{ fontSize: 20 }}
-                                    />
-                                ) : (
-                                    <ErrorIcon
-                                        className="text-yellow-600"
-                                        sx={{ fontSize: 20 }}
-                                    />
-                                )}
-                                <p className="text-xs font-semibold text-slate-700">
-                                    Importación completada
-                                </p>
-                            </div>
-                            <div className="space-y-1 text-xs text-slate-600">
+                            <div className="space-y-1 text-xs">
                                 <p>
                                     ✅ Exitosos: <strong>{importResult.succeeded}</strong>
                                 </p>
@@ -413,56 +410,32 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                                 </p>
                                 <p>📦 Total procesados: {importResult.processed}</p>
                             </div>
-                            {importResult.results &&
-                                importResult.results.some((r) => r.status === "error") && (
-                                    <div className="mt-2 max-h-24 overflow-y-auto rounded border border-red-200 bg-white p-2">
-                                        <p className="mb-1 text-xs font-semibold text-red-700">
-                                            Errores:
-                                        </p>
-                                        {importResult.results
-                                            .filter((r) => r.status === "error")
-                                            .map((result, index) => (
-                                                <p key={index} className="text-xs text-red-600">
-                                                    • {result.sku}: {result.error}
-                                                </p>
-                                            ))}
-                                    </div>
-                                )}
-                        </div>
+                            {importResult.results?.some((r) => r.status === "error") && (
+                                <div className="mt-2 max-h-24 overflow-y-auto rounded border border-red-200 bg-white p-2">
+                                    <p className="mb-1 text-xs font-semibold text-red-700">Errores:</p>
+                                    {importResult.results
+                                        .filter((r) => r.status === "error")
+                                        .map((result, index) => (
+                                            <p key={index} className="text-xs text-red-600">
+                                                • {result.sku}: {result.error}
+                                            </p>
+                                        ))}
+                                </div>
+                            )}
+                        </AlertMessage>
                     )}
 
-                    {/* Instrucciones adicionales */}
                     {!parsedData && !parseError && (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <p className="mb-2 text-xs font-semibold text-slate-700">
-                                Columnas esperadas en Excel/CSV:
+                                Columnas requeridas:
                             </p>
                             <ul className="space-y-1 text-xs text-slate-600">
-                                <li className="flex gap-2">
-                                    <span>•</span>
-                                    <span>
-                                        <strong>SKU</strong> o <strong>SKUSIMPLE</strong>: Código
-                                        del producto (requerido)
-                                    </span>
-                                </li>
-                                <li className="flex gap-2">
-                                    <span>•</span>
-                                    <span>
-                                        <strong>STOCK</strong> o <strong>Cantidad</strong>: Cantidad
-                                        a agregar/descontar/cargar
-                                    </span>
-                                </li>
-                                <li className="flex gap-2">
-                                    <span>•</span>
-                                    <span>
-                                        <strong>MARCA</strong> o <strong>Bodega</strong>: Nombre de
-                                        la bodega/warehouse
-                                    </span>
-                                </li>
+                                <li>• <strong>SKUSIMPLE</strong>: Código del producto (requerido)</li>
+                                <li>• <strong>STOCK</strong>: Cantidad (requerido)</li>
+                                <li>• <strong>TIPO_OPERACION</strong>: AGREGAR_STOCK, DESCONTAR_STOCK o CARGA_COMPLETA (requerido)</li>
+                                <li>• <strong>MARCA</strong>: Nombre de la bodega/warehouse</li>
                             </ul>
-                            <p className="mt-2 text-xs text-slate-500">
-                                💡 La primera fila debe contener los encabezados
-                            </p>
                         </div>
                     )}
                 </div>
@@ -483,11 +456,7 @@ const ImportProductsModal = ({ open, onClose, token, tenantId, tenantName, onImp
                         variant="contained"
                         color="primary"
                         disabled={!parsedData || parsedData.length === 0 || isImporting}
-                        sx={{
-                            textTransform: "none",
-                            fontWeight: 600,
-                            borderRadius: "8px",
-                        }}
+                        sx={{ textTransform: "none", fontWeight: 600, borderRadius: "8px" }}
                     >
                         {isImporting ? (
                             <>
@@ -513,13 +482,4 @@ ImportProductsModal.propTypes = {
     onImportSuccess: PropTypes.func,
 };
 
-ImportProductsModal.defaultProps = {
-    token: null,
-    tenantId: null,
-    tenantName: null,
-    onImportSuccess: null,
-};
-
 export default ImportProductsModal;
-
-

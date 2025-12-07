@@ -32,23 +32,18 @@ const Products = () => {
         }
 
         return products.products.filter((product) => {
-            // 1. Si hay un estado seleccionado en el sidebar
             if (resolvedProductState) {
-                // Mapear 'descartada' a 'discard' si es necesario, o usar el valor directo
                 const targetState = resolvedProductState === "descartada" ? "discard" : resolvedProductState;
                 return product.state === targetState;
             }
-
-            // 2. Si NO hay estado seleccionado (vista "Todos")
-            // Mostrar todo EXCEPTO los 'discard'
             return product.state !== "discard";
         });
     }, [products?.products, resolvedProductState]);
 
     const rows = useMemo(() => {
         return filteredProducts.map((product, index) => ({
-            id: product._id || index,
-            ...product,
+              id: product._id || index,
+              ...product,
         }));
     }, [filteredProducts]);
 

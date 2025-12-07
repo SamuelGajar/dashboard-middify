@@ -2,6 +2,8 @@ import PropTypes from "prop-types";
 import { useMemo, useCallback } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import Paper from "@mui/material/Paper";
+import IconButton from "@mui/material/IconButton";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 const NoRowsOverlay = () => (
     <div className="flex h-full items-center justify-center text-sm text-slate-500">
@@ -75,7 +77,35 @@ const ProductsTableGrid = ({
             { field: "quantity", headerName: "Cantidad", width: 100, type: "number" },
             { field: "price", headerName: "Precio", width: 100, type: "number" },
             { field: "state", headerName: "Estado", width: 120 },
-            { field: "message", headerName: "Mensaje", width: 250 },    
+            { field: "message", headerName: "Mensaje", width: 250 },
+            {
+                field: "detalle",
+                headerName: "Detalle",
+                width: 100,
+                sortable: false,
+                filterable: false,
+                disableColumnMenu: true,
+                align: "center",
+                headerAlign: "center",
+                renderCell: ({ row }) => (
+                    <IconButton
+                        size="small"
+                        aria-label={`Ver detalle del producto ${row.sku || row.id}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            // TODO: Implementar funcionalidad de detalle
+                        }}
+                        sx={{
+                            color: "rgb(99, 102, 241)",
+                            "&:hover": {
+                                backgroundColor: "rgba(99, 102, 241, 0.08)",
+                            },
+                        }}
+                    >
+                        <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                ),
+            },
         ];
 
         return [selectColumn, ...dataColumns];
