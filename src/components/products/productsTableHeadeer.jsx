@@ -203,7 +203,7 @@ const ProductsTableHeader = ({
 
     return (
         <>
-            <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <header className="rounded-xl mt-4 border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-baseline gap-3">

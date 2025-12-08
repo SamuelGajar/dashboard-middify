@@ -3,6 +3,7 @@ import ApartmentIcon from "@mui/icons-material/Apartment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import RestoreFromTrashOutlinedIcon from "@mui/icons-material/RestoreFromTrashOutlined";
 import LogoFull from "../assets/logo/logo-removebg-preview.png";
 import LogoCompact from "../assets/logo/middify.png";
@@ -165,6 +166,7 @@ const Sidebar = ({
   const handleOrdersToggle = () => {
     if (effectiveCollapsed) {
       onToggleCollapse(false);
+      handleOrderRootClick();
       return;
     }
     setOrdersExpanded((prev) => !prev);
@@ -173,6 +175,7 @@ const Sidebar = ({
   const handleProductsToggle = () => {
     if (effectiveCollapsed) {
       onToggleCollapse(false);
+      handleProductRootClick();
       return;
     }
     setProductsExpanded((prev) => !prev);
@@ -413,7 +416,7 @@ const Sidebar = ({
                   <div
                     className={`flex items-center ${collapsed ? "gap-0" : "gap-3"}`}
                   >
-                    {renderIconWrapper(<Inventory2Icon fontSize="small" />, activeView === "orders")}
+                    {renderIconWrapper(<ShoppingCartIcon fontSize="small" />, activeView === "orders")}
                     {!collapsed && (
                       <span className={`transition-colors duration-200 ${activeView === "orders" ? "text-white font-semibold" : "text-white/80 group-hover:text-white"
                         }`}>
