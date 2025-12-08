@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { useMemo, useCallback } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import Paper from "@mui/material/Paper";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 const NoRowsOverlay = () => (
     <div className="flex h-full items-center justify-center text-sm text-slate-500">
@@ -16,6 +17,7 @@ const ProductsTableGrid = ({
     selectedRowIds,
     onToggleRowSelection,
     onToggleAllRows,
+    onViewDetails,
 }) => {
     const allRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
 
@@ -75,7 +77,25 @@ const ProductsTableGrid = ({
             { field: "quantity", headerName: "Cantidad", width: 100, type: "number" },
             { field: "price", headerName: "Precio", width: 100, type: "number" },
             { field: "state", headerName: "Estado", width: 120 },
-            { field: "message", headerName: "Mensaje", width: 250 },    
+            { field: "message", headerName: "Mensaje", width: 250 },
+            {
+                field: "details",
+                headerName: "Detalle",
+                width: 80,
+                sortable: false,
+                filterable: false,
+                renderCell: (params) => (
+                    <div className="flex h-full w-full items-center justify-center">
+                        <VisibilityIcon
+                            className="cursor-pointer text-slate-400 hover:text-indigo-600"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onViewDetails(params.row.id || params.row._id);
+                            }}
+                        />
+                    </div>
+                ),
+            },
         ];
 
         return [selectColumn, ...dataColumns];
@@ -163,10 +183,12 @@ ProductsTableGrid.propTypes = {
     selectedRowIds: PropTypes.instanceOf(Set).isRequired,
     onToggleRowSelection: PropTypes.func.isRequired,
     onToggleAllRows: PropTypes.func.isRequired,
+    onViewDetails: PropTypes.func,
 };
 
 ProductsTableGrid.defaultProps = {
     error: null,
+    onViewDetails: () => { },
 };
 
 export default ProductsTableGrid;

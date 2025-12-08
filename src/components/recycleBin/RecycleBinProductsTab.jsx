@@ -2,7 +2,9 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { DataGrid } from "@mui/x-data-grid";
 import Paper from "@mui/material/Paper";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useProducts } from "../../api/products/getProducts";
+import ProductDetailsModal from "../products/DetailsOrders";
 
 const numberFormatter = new Intl.NumberFormat("es-CL");
 
@@ -28,6 +30,20 @@ const RecycleBinProductsTab = ({
         refreshTrigger,
         "discard"
     );
+
+    // Estado local para el modal de detalles
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState(null);
+
+    const handleViewDetails = (id) => {
+        setSelectedProductId(id);
+        setDetailsOpen(true);
+    };
+
+    const handleCloseDetails = () => {
+        setDetailsOpen(false);
+        setSelectedProductId(null);
+    };
 
     const rows = useMemo(() => {
         if (!Array.isArray(products?.products)) {
@@ -148,6 +164,24 @@ const RecycleBinProductsTab = ({
                     }
                 },
             },
+            {
+                field: "details",
+                headerName: "Detalle",
+                width: 80,
+                sortable: false,
+                filterable: false,
+                renderCell: (params) => (
+                    <div className="flex h-full w-full items-center justify-center">
+                        <VisibilityIcon
+                            className="cursor-pointer text-slate-400 hover:text-indigo-600"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(params.row.id || params.row._id);
+                            }}
+                        />
+                    </div>
+                ),
+            },
         ];
 
         return [selectColumn, ...dataColumns];
@@ -250,6 +284,13 @@ const RecycleBinProductsTab = ({
                     </div>
                 </div>
             </section>
+
+            <ProductDetailsModal
+                open={detailsOpen}
+                onClose={handleCloseDetails}
+                productId={selectedProductId}
+                token={token}
+            />
         </div>
     );
 };

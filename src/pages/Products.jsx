@@ -5,6 +5,7 @@ import { postExportProducts } from "../api/products/postExportProducts";
 import ProductsTableHeader from "../components/products/productsTableHeadeer";
 import ProductsTableGrid from "../components/products/ProductsTableGrid";
 import { alertsProducts } from "../utils/alertsProducts";
+import ProductDetailsModal from "../components/products/DetailsOrders";
 
 const Products = () => {
     const { token, selectedTenantId, selectedTenantName, user, resolvedProductState } = useOutletContext() || {};
@@ -12,6 +13,20 @@ const Products = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [selectedRowIds, setSelectedRowIds] = useState(() => new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Estado local para el modal de detalles
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState(null);
+
+    const handleViewDetails = (id) => {
+        setSelectedProductId(id);
+        setDetailsOpen(true);
+    };
+
+    const handleCloseDetails = () => {
+        setDetailsOpen(false);
+        setSelectedProductId(null);
+    };
 
     const { products, loading, error } = useProducts(
         token,
@@ -125,6 +140,14 @@ const Products = () => {
                 selectedRowIds={selectedRowIds}
                 onToggleRowSelection={handleToggleRowSelection}
                 onToggleAllRows={handleToggleAllRows}
+                onViewDetails={handleViewDetails}
+            />
+
+            <ProductDetailsModal
+                open={detailsOpen}
+                onClose={handleCloseDetails}
+                productId={selectedProductId}
+                token={token}
             />
         </div>
     );
