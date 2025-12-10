@@ -4,7 +4,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import Paper from "@mui/material/Paper";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useProducts } from "../../api/products/getProducts";
-import ProductDetailsModal from "../products/DetailsOrders";
+import ProductDetailsModal from "../products/ProductDetails";
 
 const numberFormatter = new Intl.NumberFormat("es-CL");
 

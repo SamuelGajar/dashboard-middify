@@ -1,31 +1,21 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { useProducts } from "../api/products/getProducts";
 import { postExportProducts } from "../api/products/postExportProducts";
 import ProductsTableHeader from "../components/products/productsTableHeadeer";
 import ProductsTableGrid from "../components/products/ProductsTableGrid";
 import { alertsProducts } from "../utils/alertsProducts";
-import ProductDetailsModal from "../components/products/DetailsOrders";
 
 const Products = () => {
     const { token, selectedTenantId, selectedTenantName, user, resolvedProductState } = useOutletContext() || {};
+    const navigate = useNavigate();
     
     const [isExporting, setIsExporting] = useState(false);
     const [selectedRowIds, setSelectedRowIds] = useState(() => new Set());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Estado local para el modal de detalles
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const [selectedProductId, setSelectedProductId] = useState(null);
-
     const handleViewDetails = (id) => {
-        setSelectedProductId(id);
-        setDetailsOpen(true);
-    };
-
-    const handleCloseDetails = () => {
-        setDetailsOpen(false);
-        setSelectedProductId(null);
+        navigate(`/products/${id}`);
     };
 
     const { products, loading, error } = useProducts(
@@ -97,10 +87,13 @@ const Products = () => {
         if (!token) return;
         setIsExporting(true);
         try {
-            const response = await postExportProducts(token, {
+            const exportBody = {
                 tenantId: selectedTenantId,
                 tenantName: selectedTenantName,
-            });
+                state: resolvedProductState === "descartada" ? "discard" : resolvedProductState
+            };
+
+            const response = await postExportProducts(token, exportBody);
             if (response?.message) {
                 alertsProducts.exportSuccess(response.message);
             }
@@ -141,13 +134,6 @@ const Products = () => {
                 onToggleRowSelection={handleToggleRowSelection}
                 onToggleAllRows={handleToggleAllRows}
                 onViewDetails={handleViewDetails}
-            />
-
-            <ProductDetailsModal
-                open={detailsOpen}
-                onClose={handleCloseDetails}
-                productId={selectedProductId}
-                token={token}
             />
         </div>
     );

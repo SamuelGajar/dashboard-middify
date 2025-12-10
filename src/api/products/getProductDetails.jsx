@@ -17,6 +17,5 @@ export const getProductDetails = async (token, productId) => {
     throw new Error(data.message || 'Error al obtener detalles');
   }
 
-  // Aseguramos que el ID esté presente si la API no lo devuelve en el root
   return { ...data, _id: productId };
 };
